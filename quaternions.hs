@@ -1,4 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 import Vector
 
-type H = LinearSpan 4 Double
+type H = Span 4 Double
+
+bH = cannonicalBasis (Span 4 Double)
+
