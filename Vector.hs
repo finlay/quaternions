@@ -3,6 +3,7 @@
 {- LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {- LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 module Vector where
@@ -26,9 +27,10 @@ data LinearSpan ( d :: Nat ) elm
 data family Elem a :: *
 data instance Elem (LinearSpan d e) = EL (V.Vector e)
 
-instance (V.Unbox e, Num e) => Additive (Elem (LinearSpan d e)) where
-    zero   = let mkZero :: Sing d -> V.Vector e
-                 mkZero d = V.replicate (fromSing d) 0
-		     in  EL (withSing mkZero)
-    minus  = undefined
-    plus   = undefined
+instance (V.Unbox e, Num e, SingI d) => Additive (Elem (LinearSpan d e)) where
+    zero                 = let mkZero :: Sing d -> Elem (LinearSpan d e)
+                               mkZero = EL . (flip V.replicate 0) . (fromInteger . fromSing)
+                           in  withSing mkZero
+    minus (EL v)         = EL $ V.map negate v
+    plus  (EL v) (EL w)  = EL $ V.zipWith (+) v w
+
