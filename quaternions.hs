@@ -2,16 +2,16 @@
 {-# LANGUAGE FlexibleInstances #-}
 import Vector
 
-h = undefined :: Span 4 Double
+type H = Span 4 Double
 
-bH = cannonicalBasisWithNames ["e","i","j","k"] h
+bH = cannonicalBasisWithNames ["e","i","j","k"] (undefined :: H)
 
 [e,i,j,k] = elements bH
 
-instance Show (Elem (Span 4 Double)) where
+instance Show (Elem H) where
     show = showInBasis bH
 
-instance Num (Elem (Span 4 Double)) where
+instance Num (Elem H) where
     (+) v w = plus v w
     (*) v w = undefined
     (-) v w = plus v (minus w)

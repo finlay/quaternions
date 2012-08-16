@@ -106,3 +106,8 @@ showInBasis basis v =
               ss -> concat ss
 
 
+
+{-
+ - Now we want to do the tensor product thing.
+ -}
+
