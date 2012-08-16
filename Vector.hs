@@ -3,6 +3,7 @@
 {- LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {- LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
@@ -51,7 +52,7 @@ on the domain.  Do I need some kind of associated type ?
 
 -}
 
-data Basis v = Basis [(Elem v, String)]
+data Basis v = Basis [(Elem v, String)] 
 cannonicalBasisWithNames :: (SingI d, V.Unbox e, Num e) 
                          =>  [String] -> Span d e -> Basis (Span d e)
 cannonicalBasisWithNames nms v = 
@@ -62,7 +63,7 @@ cannonicalBasisWithNames nms v =
                 dim = fromInteger $ fromSing d
                 es = map mke [1 .. dim]
                 delta i j = if i == j then 1 else 0
-                mke i = EL $ V.generate dim (delta dim)
+                mke i = EL $ V.generate dim (delta (i-1)) -- numbering from zero
             in  Basis $ zip es nms
     in withSing (cbwn nms v)
 
