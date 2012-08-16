@@ -80,6 +80,29 @@ cannonicalBasis v =
     in  withSing (cb v)
 
 
+elements :: Basis v -> [Elem v]
+elements (Basis bs) = map fst bs
 
+labels :: Basis v -> [String]
+labels (Basis bs) = map snd bs
+
+showInBasis :: (Show e, V.Unbox e, RealFrac e) 
+            => Basis (Span d e) -> Elem (Span d e) -> String
+showInBasis basis v = 
+    let es = elements basis
+        dot (EL v) (EL w) =  V.sum $ V.zipWith (*) v w
+        coef = map (dot v) es
+        pairs = zip (labels basis) coef 
+        showPair (b, n) 
+           | n == 1.0    = " + "                  ++ b
+           | n == -1.0   = " - "                  ++ b
+           | n > 0       = " + " ++ showN n       ++ b
+           | otherwise   = " - " ++ showN (abs n) ++ b
+        showN n = if n == fromInteger (round n) 
+                   then show (round n) 
+                   else show n
+    in  case map showPair . filter (\(_,n) -> n /= 0.0) $ pairs of 
+              [] -> " 0"
+              ss -> concat ss
 
 
