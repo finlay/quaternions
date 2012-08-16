@@ -4,19 +4,9 @@ import Vector
 
 type H = Span 4 Double
 
-bH = cannonicalBasisWithNames ["e","i","j","k"] (undefined :: H)
+basisH = cannonicalBasisWithNames ["e","i","j","k"] :: Basis H
 
-[e,i,j,k] = elements bH
+[e,i,j,k] = elements basisH
 
-instance Show (Elem H) where
-    show = showInBasis bH
-
-instance Num (Elem H) where
-    (+) v w = plus v w
-    (*) v w = undefined
-    (-) v w = plus v (minus w)
-    negate w = minus w
-    abs = undefined
-    signum = undefined
-    fromInteger = undefined
+instance Show (Elem H) where show = showInBasis basisH
 

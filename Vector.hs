@@ -1,7 +1,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{- LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {- LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -14,84 +15,38 @@ import GHC.TypeLits
 --import Data.Array.Repa
 import qualified Data.Vector.Unboxed as V
 
-class Additive v where 
-    zero   :: v
-    minus  :: v -> v
-    plus   :: v -> v -> v
+class VectorSpace v where
+    data Elem v :: *
+    type Scalar v :: *
+    zero   :: Elem v
+    minus  :: Elem v -> Elem v
+    plus   :: Elem v -> Elem v -> Elem v
+    scale  :: Scalar v -> Elem v -> Elem v
 
--- Need to encode the dimension at both the type level.
--- Dimension is used to create the zero element.
-data Span ( d :: Nat ) elm  
+-- Working around the terrible Num class here
+instance (VectorSpace v) => Num (Elem v) where
+    (+) v w  = plus v w
+    (-) v w  = plus v (minus w)
+    negate w = minus w
 
-data family Elem a :: *
-data instance Elem (Span d e) = EL (V.Vector e)
+    (*) v w     = undefined
+    abs         = undefined
+    signum      = undefined
+    fromInteger i = if i == 0 then zero else undefined
 
-instance (V.Unbox e, Num e, SingI d) => Additive (Elem (Span d e)) where
-    zero                 = let mkZero :: Sing d -> Elem (Span d e)
-                               mkZero = EL . (flip V.replicate 0) . (fromInteger . fromSing)
-                           in  withSing mkZero
-    minus (EL v)         = EL $ V.map negate v
-    plus  (EL v) (EL w)  = EL $ V.zipWith (+) v w
+-- Bases are encoded depending on the particular structure of v
+class VectorSpace v => HasBasis v where
+    data Basis v :: *
+    elements      :: Basis v -> [Elem v]
+    labels        :: Basis v -> [String]
+    coefficients  :: Basis v -> Elem v -> [Scalar v]
+    cannonicalBasis          :: Basis v 
+    cannonicalBasisWithNames :: [String] -> Basis v
 
-
-{-
-Now to encode the concept of a basis.
-
- data Basis v = ...
-
-A basis is a set of elements of a vector space
-that span the total. That means that any element of the basis 
-can be expanded into a linear sum of basis elements.
-
- expand :: Basis v -> [(Elem v, Double)]
-
-That allows us to pretty print elements
-
-But the main thing for us is that we can define maps using a basis 
-on the domain.  Do I need some kind of associated type ?
-
--}
-
-data Basis v = Basis [(Elem v, String)] 
-cannonicalBasisWithNames :: (SingI d, V.Unbox e, Num e) 
-                         =>  [String] -> Span d e -> Basis (Span d e)
-cannonicalBasisWithNames nms v = 
-    let cbwn :: (SingI d, Num e, V.Unbox e) 
-              => [String] -> Span d e -> Sing d -> Basis (Span d e)
-        cbwn nms v d = 
-            let dim :: Int
-                dim = fromInteger $ fromSing d
-                es = map mke [1 .. dim]
-                delta i j = if i == j then 1 else 0
-                mke i = EL $ V.generate dim (delta (i-1)) -- numbering from zero
-            in  Basis $ zip es nms
-    in withSing (cbwn nms v)
-
-cannonicalBasis :: (SingI d, V.Unbox e, Num e) 
-                => Span d e -> Basis (Span d e)
-cannonicalBasis v =     
-    let cb :: (SingI d, Num e, V.Unbox e) 
-            => Span d e -> Sing d -> Basis (Span d e)
-        cb v d =
-            let dim :: Int
-                dim = fromInteger $ fromSing d
-                nms = map (("e"++).show) [1 .. dim]
-            in  cannonicalBasisWithNames nms v
-    in  withSing (cb v)
-
-
-elements :: Basis v -> [Elem v]
-elements (Basis bs) = map fst bs
-
-labels :: Basis v -> [String]
-labels (Basis bs) = map snd bs
-
-showInBasis :: (Show e, V.Unbox e, RealFrac e) 
-            => Basis (Span d e) -> Elem (Span d e) -> String
+showInBasis :: (HasBasis v, RealFrac (Scalar v), Show (Scalar v)) 
+            => Basis v -> Elem v -> String
 showInBasis basis v = 
-    let es = elements basis
-        dot (EL v) (EL w) =  V.sum $ V.zipWith (*) v w
-        coef = map (dot v) es
+    let coef = coefficients basis v
         pairs = zip (labels basis) coef 
         showPair (b, n) 
            | n == 1.0    = " + "                  ++ b
@@ -107,7 +62,54 @@ showInBasis basis v =
 
 
 
+-- Encode the dimension at the type level.
+-- The dimension is used to create the zero element.
+data Span ( d :: Nat ) elm  
+
+instance (V.Unbox e, Num e, SingI d) => VectorSpace (Span d e) where
+    data Elem (Span d e) = EL (V.Vector e)
+    type Scalar (Span d e) = e
+    zero                 = let mkZero :: Sing d -> Elem (Span d e)
+                               mkZero = EL . (flip V.replicate 0) . (fromInteger . fromSing)
+                           in  withSing mkZero
+    minus (EL v)         = EL $ V.map negate v
+    plus  (EL v) (EL w)  = EL $ V.zipWith (+) v w
+    scale n (EL v)       = EL $ V.map (n*) v
+
+
+instance (V.Unbox e, SingI d, Num e) => HasBasis (Span d e) where
+    data Basis (Span d e) = Basis [(Elem (Span d e), String)] 
+    elements (Basis bs) = map fst bs
+    labels   (Basis bs) = map snd bs 
+    coefficients b e =
+        let dot (EL v) (EL w) =  V.sum $ V.zipWith (*) v w
+        in  map (dot e) (elements b)
+
+    cannonicalBasisWithNames nms = 
+        let cbwn :: (SingI d, Num e, V.Unbox e) 
+                  => [String] -> Sing d -> Basis (Span d e)
+            cbwn nms d = 
+                let dim :: Int
+                    dim = fromInteger $ fromSing d
+                    es = map mke [1 .. dim]
+                    delta i j = if i == j then 1 else 0
+                    mke i = EL $ V.generate dim (delta (i-1)) -- numbering from zero
+                in  Basis $ zip es nms
+        in withSing (cbwn nms)
+
+    cannonicalBasis =     
+        let cb :: (SingI d, Num e, V.Unbox e) 
+                => Sing d -> Basis (Span d e)
+            cb d =
+                let dim :: Int
+                    dim = fromInteger $ fromSing d
+                    nms = map (("e"++).show) [1 .. dim]
+                in  cannonicalBasisWithNames nms
+        in  withSing (cb)
+
+
+
 {-
- - Now we want to do the tensor product thing.
+ - Now we can do the tensor product thing.
  -}
 
