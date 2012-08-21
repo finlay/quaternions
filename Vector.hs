@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -51,7 +52,7 @@ showInBasis basis v =
         showPair (b, n) 
            | n == 1.0    = " + "                  ++ b
            | n == -1.0   = " - "                  ++ b
-           | n > 0       = " + " ++ showN n       ++ b
+           | n > 0       = " + " ++ showN n   e   ++ b
            | otherwise   = " - " ++ showN (abs n) ++ b
         showN n = if n == fromInteger (round n) 
                    then show (round n) 
@@ -108,8 +109,28 @@ instance (V.Unbox e, SingI d, Num e) => HasBasis (Span d e) where
         in  withSing (cb)
 
 
+-- Now need to define linear maps as extensions of a basis
+extend :: (HasBasis v, VectorSpace w, Scalar v ~ Scalar w) 
+       => Basis v -> (Elem v -> Elem w) -> (Elem v -> Elem w)
+extend b f v = 
+    let c = coefficients b v 
+        ws = map f (elements b)
+    in  foldr1 plus $ map (uncurry scale) $ zip c ws
 
-{-
- - Now we can do the tensor product thing.
- -}
+-- Now we can do the tensor product thing.
+class (VectorSpace v, VectorSpace w, Scalar v ~ Scalar w,
+        HasBasis v, HasBasis w, Num (Scalar w)) 
+        => TensorProd v w where
+    type Tensor v w :: *
+    tensor :: (Scalar (Tensor v w) ~ Scalar v, HasBasis (Tensor v w)) 
+           => Elem v -> Elem w -> Elem (Tensor v w)
+    tensor v w = 
+        let vs  = coefficients cannonicalBasis v
+            ws  = coefficients cannonicalBasis w
+            vws = [ vsc * wsc | vsc <- vs, wsc <- ws ]
+        in  foldr1 plus $ map (uncurry scale) $ zip vws (elements cannonicalBasis)
+
+instance (V.Unbox e, Num e, SingI n, SingI m, SingI (m*n))
+         => TensorProd (Span m e) (Span n e) where
+    type Tensor (Span m e) (Span n e) = Span (m*n) e
 
