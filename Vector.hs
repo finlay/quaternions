@@ -52,7 +52,7 @@ showInBasis basis v =
         showPair (b, n) 
            | n == 1.0    = " + "                  ++ b
            | n == -1.0   = " - "                  ++ b
-           | n > 0       = " + " ++ showN n   e   ++ b
+           | n > 0       = " + " ++ showN n       ++ b
            | otherwise   = " - " ++ showN (abs n) ++ b
         showN n = if n == fromInteger (round n) 
                    then show (round n) 
@@ -130,7 +130,7 @@ class (VectorSpace v, VectorSpace w, Scalar v ~ Scalar w,
             vws = [ vsc * wsc | vsc <- vs, wsc <- ws ]
         in  foldr1 plus $ map (uncurry scale) $ zip vws (elements cannonicalBasis)
 
-instance (V.Unbox e, Num e, SingI n, SingI m, SingI (m*n))
-         => TensorProd (Span m e) (Span n e) where
-    type Tensor (Span m e) (Span n e) = Span (m*n) e
+instance (V.Unbox e, Num e)
+         => TensorProd (Span 4 e) (Span 4 e) where
+    type Tensor (Span 4 e) (Span 4 e) = Span 16 e
 
