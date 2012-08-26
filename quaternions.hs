@@ -1,21 +1,14 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 import Vector
 
-type H = Span 4 Double
-basis = ["e","i","j","k"]
-basisH = cannonicalBasisWithNames basis :: Basis H
-
-[e,i,j,k] = elements basisH
-
-instance Show (Elem H) where show = showInBasis basisH
-
-type HH = Tensor H H 
-basisHH = cannonicalBasisWithNames bs :: Basis HH
-    where bs = [ x ++ "\\otimes " ++ y | x <- basis, y <- basis ]
-
-
---instance Show (Elem HH) where show = showInBasis basisHH
-
+data H  -- identity
+instance Span H where
+    type Dimension H  = 4 
+    type ScalarType H = Double
+    type BasisType H  = String
+    basis = ["e","i","j","k"]
 
