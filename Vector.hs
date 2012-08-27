@@ -61,8 +61,12 @@ instance (VectorSpace v, HasBasis v, RealFrac (Scalar v), Show (Scalar v))
                   [] -> " 0"
                   ss -> concat ss
 
-
-
+-- We can define linear maps by extending the map from a basis
+extend :: (HasBasis v, VectorSpace w, Scalar v ~ Scalar w) 
+       => Basis v -> (Elem v -> Elem w) -> Elem v -> Elem w
+extend b f = 
+    let ws = map f (elements b)
+    in  foldr1 plus . map (uncurry $ flip scale) . zip ws . coefficients b
 
 -- Now we can do the tensor product thing.
 data Tensor v w

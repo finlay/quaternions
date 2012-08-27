@@ -20,3 +20,17 @@ instance Show (BasisType H) where
 
 e,i,j,k :: Elem H
 [e,i,j,k] = elements canonical
+
+mu :: Elem (Tensor H H) -> Elem H
+mu = extend canonical mu'
+      where mu' (tensor e b) = b
+            mu' (tensor b e) = b
+            mu' (tensor i j) = k
+            mu' (tensor j k) = i
+            mu' (tensor k i) = j
+            mu' (tensor j i) = -k
+            mu' (tensor k j) = -i
+            mu' (tensor i k) = -j
+            mu' (tensor i i) = -e
+            mu' (tensor j j) = -e
+            mu' (tensor k k) = -e
