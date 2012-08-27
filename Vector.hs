@@ -4,15 +4,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{- LANGUAGE DataKinds #-}
 {- LANGUAGE TypeSynonymInstances #-}
-{- LANGUAGE MultiParamTypeClasses #-}
 {- LANGUAGE NoMonomorphismRestriction #-}
 {- LANGUAGE StandaloneDeriving #-}
 {- LANGUAGE KindSignatures #-}
 module Vector where
 
-import GHC.TypeLits
 
 --import Data.Array.Repa
 import qualified Data.Vector.Unboxed as V
@@ -39,7 +38,7 @@ instance (VectorSpace v) => Num (Elem v) where
 -- Bases are encoded depending on the particular structure of v
 class VectorSpace v => HasBasis v where
     data Basis v :: *
-    cannonical    :: Basis v 
+    canonical     :: Basis v 
     elements      :: Basis v -> [Elem v]
     labels        :: Basis v -> [String]
     coefficients  :: Basis v -> Elem v -> [Scalar v]
@@ -47,7 +46,7 @@ class VectorSpace v => HasBasis v where
 instance (VectorSpace v, HasBasis v, RealFrac (Scalar v), Show (Scalar v)) 
             => Show (Elem v) where
     show v = 
-        let bs = cannonical :: Basis v
+        let bs = canonical :: Basis v
             coef = coefficients bs v
             pairs = zip (labels bs) coef 
             showPair (b, n) 
@@ -64,28 +63,35 @@ instance (VectorSpace v, HasBasis v, RealFrac (Scalar v), Show (Scalar v))
 
 
 
--- Encode the dimension at the type level.
--- The dimension is used to create the zero element.
+
+-- Now we can do the tensor product thing.
+data Tensor v w
+tensor :: (HasBasis v, HasBasis w, HasBasis (Tensor v w), Scalar v ~ Scalar w, Num(Scalar v))
+       => Elem v -> Elem w -> Elem (Tensor v w)
+tensor v w = 
+    let vs  = coefficients canonical v
+        ws  = coefficients canonical w
+        vws = [ vsc * wsc | vsc <- vs, wsc <- ws ]
+    in  foldr1 plus $ map (uncurry scale) $ zip vws (elements canonical)
+
+
+-- Hold the types together 
 class Span v where
-    type Dimension v :: Nat
     type ScalarType v :: *
     data BasisType v :: *
-    basis :: (Show (BasisType v)) => [BasisType v]
+    basis :: [BasisType v]
 
-instance (V.Unbox (ScalarType v), Num (ScalarType v), SingI (Dimension v), Span v) 
+instance (V.Unbox (ScalarType v), Num (ScalarType v), Span v) 
     => VectorSpace v where
     data Elem v = EL (V.Vector (ScalarType v))
     type Scalar v = ScalarType v
-    zero                 = let mkZero :: Sing (Dimension v) -> Elem v
-                               mkZero = EL . (flip V.replicate 0) . (fromInteger . fromSing)
-                           in  withSing mkZero
+    zero                 = let bs = basis :: [BasisType v]
+                           in  EL $ V.replicate (length bs) 0 
     minus (EL v)         = EL $ V.map negate v
     plus  (EL v) (EL w)  = EL $ V.zipWith (+) v w
     scale n (EL v)       = EL $ V.map (n*) v
 
-
-instance (Span v, V.Unbox (ScalarType v), SingI (Dimension v),
-          Num (ScalarType v), Show (BasisType v)) 
+instance (Span v, V.Unbox (ScalarType v), Num (ScalarType v), Show (BasisType v)) 
     => HasBasis v where
     data Basis v = Basis [(Elem v, BasisType v)] 
     elements (Basis bs) = map fst bs
@@ -93,39 +99,20 @@ instance (Span v, V.Unbox (ScalarType v), SingI (Dimension v),
     coefficients b e =
         let dot (EL v) (EL w) =  V.sum $ V.zipWith (*) v w
         in  map (dot e) (elements b)
-    cannonical =  
-        let cbwn :: (SingI (Dimension v), Num (ScalarType v), V.Unbox (ScalarType v)) 
-                 => [BasisType v] -> Sing (Dimension v) -> Basis v
-            cbwn bs d = 
-                let dim = fromInteger $ fromSing d
-                    es = map mke [1 .. dim]
-                    delta i j = if i == j then 1 else 0
-                    mke i = EL $ V.generate dim (delta (i-1)) -- numbering from zero
-                in  Basis $ zip es bs
-        in withSing ( cbwn basis )
+    canonical = 
+        let bs = basis :: [BasisType v]
+            dim = length bs
+            es = map mke [1 .. dim]
+            delta i j = if i == j then 1 else 0
+            mke i = EL $ V.generate dim (delta (i-1)) -- numbering from zero
+        in  Basis $ zip es bs
 
--- -- Now need to define linear maps as extensions of a basis
--- extend :: (HasBasis v, VectorSpace w, Scalar v ~ Scalar w) 
---        => Basis v -> (Elem v -> Elem w) -> (Elem v -> Elem w)
--- extend b f v = 
---     let c = coefficients b v 
---         ws = map f (elements b)
---     in  foldr1 plus $ map (uncurry scale) $ zip c ws
--- 
--- -- Now we can do the tensor product thing.
--- class (VectorSpace v, VectorSpace w, Scalar v ~ Scalar w,
---         HasBasis v, HasBasis w, Num (Scalar w)) 
---         => TensorProd v w where
---     type Tensor v w :: *
---     tensor :: (Scalar (Tensor v w) ~ Scalar v, HasBasis (Tensor v w)) 
---            => Elem v -> Elem w -> Elem (Tensor v w)
---     tensor v w = 
---         let vs  = coefficients cannonicalBasis v
---             ws  = coefficients cannonicalBasis w
---             vws = [ vsc * wsc | vsc <- vs, wsc <- ws ]
---         in  foldr1 plus $ map (uncurry scale) $ zip vws (elements cannonicalBasis)
--- 
--- instance (V.Unbox e, Num e)
---          => TensorProd (Span 4 e) (Span 4 e) where
---     type Tensor (Span 4 e) (Span 4 e) = Span 16 e
--- 
+instance (Span v, Span w) => Span (Tensor v w) where
+    type ScalarType (Tensor v w)  = ScalarType v
+    data BasisType  (Tensor v w)  = BT (BasisType v) (BasisType w)
+    basis = [BT bv bw | bv <- basis, bw <- basis]
+
+instance (Show (BasisType v), Show (BasisType w))
+    => Show (BasisType (Tensor v w)) where
+    show (BT bv bw) = show bv ++ "\x2297 " ++ show bw
+

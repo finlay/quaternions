@@ -1,14 +1,13 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
-{- LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
+{- LANGUAGE DataKinds #-}
+{- LANGUAGE TypeOperators #-}
 {- LANGUAGE MultiParamTypeClasses #-}
 import Vector
 
 data H  -- identity
 
 instance Span H where
-    type Dimension H  = 4 
     type ScalarType H = Double
     data BasisType H  = E | I | J | K deriving Eq
     basis = [E, I, J, K]
@@ -20,4 +19,4 @@ instance Show (BasisType H) where
     show K = "k"
 
 e,i,j,k :: Elem H
-[e,i,j,k] = elements cannonical
+[e,i,j,k] = elements canonical
