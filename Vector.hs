@@ -24,17 +24,6 @@ class VectorSpace v where
     plus   :: Elem v -> Elem v -> Elem v
     scale  :: Scalar v -> Elem v -> Elem v
 
--- Working around the terrible Num class here
-instance (VectorSpace v) => Num (Elem v) where
-    (+) v w  = plus v w
-    (-) v w  = plus v (minus w)
-    negate w = minus w
-
-    (*) v w     = undefined
-    abs         = undefined
-    signum      = undefined
-    fromInteger i = if i == 0 then zero else undefined
-
 -- Bases are encoded depending on the particular structure of v
 class VectorSpace v => HasBasis v where
     data Basis v :: *
@@ -62,11 +51,12 @@ instance (VectorSpace v, HasBasis v, RealFrac (Scalar v), Show (Scalar v))
                   ss -> concat ss
 
 -- We can define linear maps by extending the map from a basis
-extend :: (HasBasis v, VectorSpace w, Scalar v ~ Scalar w) 
-       => Basis v -> (Elem v -> Elem w) -> Elem v -> Elem w
-extend b f = 
-    let ws = map f (elements b)
-    in  foldr1 plus . map (uncurry $ flip scale) . zip ws . coefficients b
+extend :: (Span v, Span w, Scalar v ~ Scalar w, 
+           Num (Scalar w), V.Unbox (Scalar w), Show (BasisType v)) 
+       => (BasisType v -> Elem w) -> Elem v -> Elem w
+extend f = 
+    let ws = map f basis
+    in  foldr1 plus . map (uncurry $ flip scale) . zip ws . coefficients canonical
 
 -- Now we can do the tensor product thing.
 data Tensor v w
@@ -77,6 +67,22 @@ tensor v w =
         ws  = coefficients canonical w
         vws = [ vsc * wsc | vsc <- vs, wsc <- ws ]
     in  foldr1 plus $ map (uncurry scale) $ zip vws (elements canonical)
+
+
+class VectorSpace v => Algebra v where
+    unit :: Elem v
+    mul  :: Elem v -> Elem v -> Elem v
+
+-- Working around the terrible Num class here
+instance (Algebra v, Num (Scalar v)) => Num (Elem v) where
+    (+) v w  = plus v w
+    (-) v w  = plus v (minus w)
+    negate w = minus w
+
+    (*) v w     = mul v w
+    abs         = undefined
+    signum      = undefined
+    fromInteger i  = scale (fromInteger i) unit
 
 
 -- Hold the types together 
@@ -113,10 +119,10 @@ instance (Span v, V.Unbox (ScalarType v), Num (ScalarType v), Show (BasisType v)
 
 instance (Span v, Span w) => Span (Tensor v w) where
     type ScalarType (Tensor v w)  = ScalarType v
-    data BasisType  (Tensor v w)  = BT (BasisType v) (BasisType w)
-    basis = [BT bv bw | bv <- basis, bw <- basis]
+    data BasisType  (Tensor v w)  = BTensor (BasisType v) (BasisType w)
+    basis = [BTensor bv bw | bv <- basis, bw <- basis]
 
 instance (Show (BasisType v), Show (BasisType w))
     => Show (BasisType (Tensor v w)) where
-    show (BT bv bw) = show bv ++ "\x2297 " ++ show bw
+    show (BTensor bv bw) = show bv ++ "\x2297 " ++ show bw
 
