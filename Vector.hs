@@ -1,14 +1,15 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
+{- LANGUAGE TypeSynonymInstances #-}
+{- LANGUAGE MultiParamTypeClasses #-}
+{- LANGUAGE NoMonomorphismRestriction #-}
+{- LANGUAGE StandaloneDeriving #-}
+{- LANGUAGE KindSignatures #-}
 module Vector where
 
 import GHC.TypeLits
@@ -43,22 +44,23 @@ class VectorSpace v => HasBasis v where
     labels        :: Basis v -> [String]
     coefficients  :: Basis v -> Elem v -> [Scalar v]
 
-showInBasis :: (HasBasis v, RealFrac (Scalar v), Show (Scalar v)) 
-            => Basis v -> Elem v -> String
-showInBasis basis v = 
-    let coef = coefficients basis v
-        pairs = zip (labels basis) coef 
-        showPair (b, n) 
-           | n == 1.0    = " + "                  ++ b
-           | n == -1.0   = " - "                  ++ b
-           | n > 0       = " + " ++ showN n       ++ b
-           | otherwise   = " - " ++ showN (abs n) ++ b
-        showN n = if n == fromInteger (round n) 
-                   then show (round n) 
-                   else show n
-    in  case map showPair . filter (\(_,n) -> n /= 0.0) $ pairs of 
-              [] -> " 0"
-              ss -> concat ss
+instance (VectorSpace v, HasBasis v, RealFrac (Scalar v), Show (Scalar v)) 
+            => Show (Elem v) where
+    show v = 
+        let bs = cannonical :: Basis v
+            coef = coefficients bs v
+            pairs = zip (labels bs) coef 
+            showPair (b, n) 
+               | n == 1.0    = " + "                  ++ b
+               | n == -1.0   = " - "                  ++ b
+               | n > 0       = " + " ++ showN n       ++ b
+               | otherwise   = " - " ++ showN (abs n) ++ b
+            showN n = if n == fromInteger (round n) 
+                       then show (round n) 
+                       else show n
+        in  case map showPair . filter (\(_,n) -> n /= 0.0) $ pairs of 
+                  [] -> " 0"
+                  ss -> concat ss
 
 
 
@@ -67,7 +69,7 @@ showInBasis basis v =
 class Span v where
     type Dimension v :: Nat
     type ScalarType v :: *
-    type BasisType v :: *
+    data BasisType v :: *
     basis :: (Show (BasisType v)) => [BasisType v]
 
 instance (V.Unbox (ScalarType v), Num (ScalarType v), SingI (Dimension v), Span v) 
@@ -82,31 +84,25 @@ instance (V.Unbox (ScalarType v), Num (ScalarType v), SingI (Dimension v), Span 
     scale n (EL v)       = EL $ V.map (n*) v
 
 
-instance (Span v, V.Unbox (ScalarType v), SingI (Dimension v), Num (ScalarType v)) 
+instance (Span v, V.Unbox (ScalarType v), SingI (Dimension v),
+          Num (ScalarType v), Show (BasisType v)) 
     => HasBasis v where
     data Basis v = Basis [(Elem v, BasisType v)] 
     elements (Basis bs) = map fst bs
-    labels   (Basis bs) = map snd bs 
+    labels   (Basis bs) = map (show . snd) bs 
     coefficients b e =
         let dot (EL v) (EL w) =  V.sum $ V.zipWith (*) v w
         in  map (dot e) (elements b)
-    cannonical = undefined
-
-
-
-
-
-
-
-cannonical2 = 
-    let cbwn :: SingI d => [BasisType v] -> Sing d -> Basis v
-        cbwn bs d = 
-            let dim = fromInteger $ fromSing d
-                es = map mke [1 .. dim]
-                delta i j = if i == j then 1 else 0
-                mke i = EL $ V.generate dim (delta (i-1)) -- numbering from zero
-            in  Basis $ zip es bs
-    in withSing ( cbwn basis )
+    cannonical =  
+        let cbwn :: (SingI (Dimension v), Num (ScalarType v), V.Unbox (ScalarType v)) 
+                 => [BasisType v] -> Sing (Dimension v) -> Basis v
+            cbwn bs d = 
+                let dim = fromInteger $ fromSing d
+                    es = map mke [1 .. dim]
+                    delta i j = if i == j then 1 else 0
+                    mke i = EL $ V.generate dim (delta (i-1)) -- numbering from zero
+                in  Basis $ zip es bs
+        in withSing ( cbwn basis )
 
 -- -- Now need to define linear maps as extensions of a basis
 -- extend :: (HasBasis v, VectorSpace w, Scalar v ~ Scalar w) 
