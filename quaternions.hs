@@ -8,7 +8,7 @@ import Vector
 data H  -- identity
 
 instance Span H where
-    type ScalarType H = Double
+    type Scalar H = Double
     data BasisType H  = E | I | J | K deriving Eq
     basis = [E, I, J, K]
 
@@ -24,13 +24,8 @@ e,i,j,k :: Elem H
 mu :: Elem (Tensor H H) -> Elem H
 mu = extend mu'
       where mu' :: BasisType (Tensor H H) -> Elem H
-            mu' (BTensor E E) = e
-            mu' (BTensor E I) = i
-            mu' (BTensor E J) = j
-            mu' (BTensor E K) = k
-            mu' (BTensor I E) = i
-            mu' (BTensor J E) = j
-            mu' (BTensor K E) = k
+            mu' (BTensor E b) = embed b
+            mu' (BTensor b E) = embed b
             mu' (BTensor I J) = k
             mu' (BTensor J K) = i
             mu' (BTensor K I) = j
@@ -45,3 +40,13 @@ instance Algebra H where
     unit    = e
     mul x y = mu (x `tensor` y)
 
+-- Now lets make Tensor H H an algebra
+instance Algebra (Tensor H H) where
+    unit = e `tensor` e
+    mul x y = extend muHH (x `tensor` y)
+            where 
+                muHH  (BTensor (BTensor x y) (BTensor x' y')) 
+                    = ((embed x) * (embed x')) `tensor` ((embed y') * (embed y))
+
+
+elms = [ embed x * embed y | x <- basis, y <- basis ] :: [Elem (Tensor H H)]

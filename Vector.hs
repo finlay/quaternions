@@ -12,25 +12,67 @@
 {- LANGUAGE KindSignatures #-}
 module Vector where
 
+import           Data.List (elemIndex)
 
 --import Data.Array.Repa
 import qualified Data.Vector.Unboxed as V
 
-class VectorSpace v where
-    data Elem v :: *
+-- Hold the types together 
+class Span v where
     type Scalar v :: *
+    data BasisType v :: *
+    basis :: [BasisType v]
+
+
+class Span v => VectorSpace v where
+    data Elem v :: *
     zero   :: Elem v
     minus  :: Elem v -> Elem v
     plus   :: Elem v -> Elem v -> Elem v
     scale  :: Scalar v -> Elem v -> Elem v
 
+instance (V.Unbox (Scalar v), Num (Scalar v), Span v) 
+    => VectorSpace v where
+    data Elem v = EL (V.Vector (Scalar v))
+    zero                 = let bs = basis :: [BasisType v]
+                           in  EL $ V.replicate (length bs) 0 
+    minus (EL v)         = EL $ V.map negate v
+    plus  (EL v) (EL w)  = EL $ V.zipWith (+) v w
+    scale n (EL v)       = EL $ V.map (n*) v
+
 -- Bases are encoded depending on the particular structure of v
 class VectorSpace v => HasBasis v where
     data Basis v :: *
+    embed         :: BasisType v -> Elem v
     canonical     :: Basis v 
     elements      :: Basis v -> [Elem v]
     labels        :: Basis v -> [String]
     coefficients  :: Basis v -> Elem v -> [Scalar v]
+
+instance (Span v, V.Unbox (Scalar v), Num (Scalar v), 
+            Show (BasisType v), Eq (BasisType v)) 
+    => HasBasis v where
+    data Basis v = Basis [(Elem v, BasisType v)] 
+    embed b = 
+        let bs = basis :: [BasisType v]
+            delta i j = if i == j then 1 else 0
+        in case elemIndex b basis of
+            Just i  -> EL $ V.generate (length bs) (delta i)
+            Nothing -> error $ "Element " ++ show b ++ " not in basis?"
+    elements (Basis bs) = map fst bs
+    labels   (Basis bs) = map (show . snd) bs 
+    coefficients b e =
+        let dot (EL v) (EL w) =  V.sum $ V.zipWith (*) v w
+        in  map (dot e) (elements b)
+    canonical = 
+        let bs = basis :: [BasisType v]
+            dim = length bs
+            es = map mke [1 .. dim]
+            delta i j = if i == j then 1 else 0
+            mke i = EL $ V.generate dim (delta (i-1)) -- numbering from zero
+        in  Basis $ zip es bs
+
+
 
 instance (VectorSpace v, HasBasis v, RealFrac (Scalar v), Show (Scalar v)) 
             => Show (Elem v) where
@@ -52,7 +94,7 @@ instance (VectorSpace v, HasBasis v, RealFrac (Scalar v), Show (Scalar v))
 
 -- We can define linear maps by extending the map from a basis
 extend :: (Span v, Span w, Scalar v ~ Scalar w, 
-           Num (Scalar w), V.Unbox (Scalar w), Show (BasisType v)) 
+           Num (Scalar w), V.Unbox (Scalar w), Show (BasisType v), Eq (BasisType v)) 
        => (BasisType v -> Elem w) -> Elem v -> Elem w
 extend f = 
     let ws = map f basis
@@ -68,6 +110,19 @@ tensor v w =
         vws = [ vsc * wsc | vsc <- vs, wsc <- ws ]
     in  foldr1 plus $ map (uncurry scale) $ zip vws (elements canonical)
 
+instance (Span v, Span w) => Span (Tensor v w) where
+    type Scalar (Tensor v w)  = Scalar v
+    data BasisType  (Tensor v w)  = BTensor (BasisType v) (BasisType w)
+    basis = [BTensor bv bw | bv <- basis, bw <- basis]
+
+instance (Show (BasisType v), Show (BasisType w))
+    => Show (BasisType (Tensor v w)) where
+    show (BTensor bv bw) = show bv ++ "\x2297 " ++ show bw
+
+instance (Eq (BasisType v), Eq (BasisType w))
+    => Eq (BasisType (Tensor v w)) where
+    BTensor bv bw == BTensor bv' bw' = bv == bv' && bw == bw'
+
 
 class VectorSpace v => Algebra v where
     unit :: Elem v
@@ -75,54 +130,13 @@ class VectorSpace v => Algebra v where
 
 -- Working around the terrible Num class here
 instance (Algebra v, Num (Scalar v)) => Num (Elem v) where
-    (+) v w  = plus v w
-    (-) v w  = plus v (minus w)
-    negate w = minus w
-
-    (*) v w     = mul v w
-    abs         = undefined
-    signum      = undefined
+    (+) v w        = plus v w
+    (-) v w        = plus v (minus w)
+    negate w       = minus w
+    (*) v w        = mul v w
+    abs            = undefined
+    signum         = undefined
     fromInteger i  = scale (fromInteger i) unit
 
 
--- Hold the types together 
-class Span v where
-    type ScalarType v :: *
-    data BasisType v :: *
-    basis :: [BasisType v]
-
-instance (V.Unbox (ScalarType v), Num (ScalarType v), Span v) 
-    => VectorSpace v where
-    data Elem v = EL (V.Vector (ScalarType v))
-    type Scalar v = ScalarType v
-    zero                 = let bs = basis :: [BasisType v]
-                           in  EL $ V.replicate (length bs) 0 
-    minus (EL v)         = EL $ V.map negate v
-    plus  (EL v) (EL w)  = EL $ V.zipWith (+) v w
-    scale n (EL v)       = EL $ V.map (n*) v
-
-instance (Span v, V.Unbox (ScalarType v), Num (ScalarType v), Show (BasisType v)) 
-    => HasBasis v where
-    data Basis v = Basis [(Elem v, BasisType v)] 
-    elements (Basis bs) = map fst bs
-    labels   (Basis bs) = map (show . snd) bs 
-    coefficients b e =
-        let dot (EL v) (EL w) =  V.sum $ V.zipWith (*) v w
-        in  map (dot e) (elements b)
-    canonical = 
-        let bs = basis :: [BasisType v]
-            dim = length bs
-            es = map mke [1 .. dim]
-            delta i j = if i == j then 1 else 0
-            mke i = EL $ V.generate dim (delta (i-1)) -- numbering from zero
-        in  Basis $ zip es bs
-
-instance (Span v, Span w) => Span (Tensor v w) where
-    type ScalarType (Tensor v w)  = ScalarType v
-    data BasisType  (Tensor v w)  = BTensor (BasisType v) (BasisType w)
-    basis = [BTensor bv bw | bv <- basis, bw <- basis]
-
-instance (Show (BasisType v), Show (BasisType w))
-    => Show (BasisType (Tensor v w)) where
-    show (BTensor bv bw) = show bv ++ "\x2297 " ++ show bw
 
