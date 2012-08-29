@@ -92,14 +92,7 @@ instance (VectorSpace v, HasBasis v, RealFrac (Scalar v), Show (Scalar v))
                   [] -> " 0"
                   ss -> concat ss
 
--- We can define linear maps by extending the map from a basis
-extend :: (Span v, Span w, Scalar v ~ Scalar w, 
-           Num (Scalar w), V.Unbox (Scalar w), Show (BasisType v), Eq (BasisType v)) 
-       => (BasisType v -> Elem w) -> Elem v -> Elem w
-extend f = 
-    let ws = map f basis
-    in  foldr1 plus . map (uncurry $ flip scale) . zip ws . coefficients canonical
-
+-- TENSOR PRODUCTS
 -- Now we can do the tensor product thing.
 data Tensor v w
 tensor :: (HasBasis v, HasBasis w, HasBasis (Tensor v w), Scalar v ~ Scalar w, Num(Scalar v))
@@ -123,7 +116,63 @@ instance (Eq (BasisType v), Eq (BasisType w))
     => Eq (BasisType (Tensor v w)) where
     BTensor bv bw == BTensor bv' bw' = bv == bv' && bw == bw'
 
+-- HOM SPACES
+-- embody the hom space as a vector space
+data Hom v w
+hom :: (HasBasis v, HasBasis w, HasBasis (Hom v w), Scalar v ~ Scalar w, Num(Scalar v))
+       => Elem v -> Elem w -> Elem (Hom v w)
+hom v w = 
+    let vs  = coefficients canonical v
+        ws  = coefficients canonical w
+        vws = [ vsc * wsc | vsc <- vs, wsc <- ws ]
+    in  foldr1 plus $ map (uncurry scale) $ zip vws (elements canonical)
 
+instance (Span v, Span w) => Span (Hom v w) where
+    type Scalar (Hom v w)  = Scalar v
+    data BasisType  (Hom v w)  = BHom (BasisType v) (BasisType w)
+    basis = [BHom bv bw | bv <- basis, bw <- basis]
+
+instance (Show (BasisType v), Show (BasisType w))
+    => Show (BasisType (Hom v w)) where
+    show (BHom bv bw) = show bv ++ " \x21A6 " ++ show bw
+
+instance (Eq (BasisType v), Eq (BasisType w))
+    => Eq (BasisType (Hom v w)) where
+    BHom bv bw == BHom bv' bw' = bv == bv' && bw == bw'
+
+apply :: (Span v, Span w, Scalar v ~ Scalar w,
+          V.Unbox (Scalar w), Num (Scalar w)) 
+      => Elem (Hom v w) -> Elem v -> Elem w
+apply f v = 
+    let EL fe = f -- length fe = dv * dw
+        EL ve = v -- length ve = dv
+        dv = V.length ve
+        m i = V.foldr1 (+) $ V.zipWith (*) ve (V.slice i (i + dv) fe)
+        res = V.generate (V.length fe `div` dv) m
+    in  EL res
+
+-- materialise a linear map into a Hom element
+materialise :: (Span v, Span w, Scalar v ~ Scalar w, 
+                Num (Scalar w), V.Unbox (Scalar w), 
+                Show (BasisType v), Eq (BasisType v),
+                Show (BasisType w), Eq (BasisType w)) 
+            => (BasisType v -> Elem w) -> Elem (Hom v w)
+materialise f = 
+    let fv = map f basis
+        v  = elements canonical
+    in  foldr1 plus . map (uncurry hom) $ zip v fv
+
+
+-- We can define linear maps by extending the map from a basis
+extend :: (Span v, Span w, Scalar v ~ Scalar w, 
+           Num (Scalar w), V.Unbox (Scalar w), 
+           Show (BasisType w), Eq (BasisType w),
+           Show (BasisType v), Eq (BasisType v)) 
+       => (BasisType v -> Elem w) -> Elem v -> Elem w
+extend f = apply (materialise f)
+
+
+-- ALGEBRAS (Associative)
 class VectorSpace v => Algebra v where
     unit :: Elem v
     mul  :: Elem v -> Elem v -> Elem v
