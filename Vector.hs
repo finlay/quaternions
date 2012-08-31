@@ -15,7 +15,10 @@ module Vector where
 import           Data.List (elemIndex)
 
 --import Data.Array.Repa
-import qualified Data.Vector.Unboxed as V
+--import qualified Data.Vector.Unboxed as V
+import qualified Data.Packed.Vector as V
+import qualified Numeric.Container as V
+import           Foreign.Storable (Storable)
 
 -- Hold the types together 
 class Span v where
@@ -31,50 +34,48 @@ class Span v => VectorSpace v where
     plus   :: Elem v -> Elem v -> Elem v
     scale  :: Scalar v -> Elem v -> Elem v
 
-instance (V.Unbox (Scalar v), Num (Scalar v), Span v) 
+instance (V.Element (Scalar v), V.Container V.Vector (Scalar v),
+          Num (Scalar v), Span v) 
     => VectorSpace v where
-    data Elem v = EL (V.Vector (Scalar v))
+    newtype Elem v = EL { unEL :: V.Vector (Scalar v) }
     zero                 = let bs = basis :: [BasisType v]
-                           in  EL $ V.replicate (length bs) 0 
-    minus (EL v)         = EL $ V.map negate v
-    plus  (EL v) (EL w)  = EL $ V.zipWith (+) v w
-    scale n (EL v)       = EL $ V.map (n*) v
+                           in  EL $ V.constant 0 (length bs) 
+    minus (EL v)         = EL $ V.scale (-1) v
+    plus  (EL v) (EL w)  = EL $ V.add v w
+    scale n (EL v)       = EL $ V.scale n v
 
 -- Bases are encoded depending on the particular structure of v
 class VectorSpace v => HasBasis v where
     data Basis v :: *
-    embed         :: BasisType v -> Elem v
+    embed         :: (Eq (BasisType v), Show (BasisType v)) => BasisType v -> Elem v
     canonical     :: Basis v 
     elements      :: Basis v -> [Elem v]
-    labels        :: Basis v -> [String]
+    labels        :: Show (BasisType v) => Basis v -> [String]
     coefficients  :: Basis v -> Elem v -> [Scalar v]
 
-instance (Span v, V.Unbox (Scalar v), Num (Scalar v), 
-            Show (BasisType v), Eq (BasisType v)) 
+instance (V.Product (Scalar v), V.Container V.Vector (Scalar v), Span v)
     => HasBasis v where
     data Basis v = Basis [(Elem v, BasisType v)] 
     embed b = 
         let bs = basis :: [BasisType v]
             delta i j = if i == j then 1 else 0
         in case elemIndex b basis of
-            Just i  -> EL $ V.generate (length bs) (delta i)
+            Just i  -> EL $ V.buildVector (length bs) (delta i)
             Nothing -> error $ "Element " ++ show b ++ " not in basis?"
     elements (Basis bs) = map fst bs
     labels   (Basis bs) = map (show . snd) bs 
-    coefficients b e =
-        let dot (EL v) (EL w) =  V.sum $ V.zipWith (*) v w
-        in  map (dot e) (elements b)
+    coefficients b (EL e) = map (V.dot e . unEL) (elements b)
     canonical = 
         let bs = basis :: [BasisType v]
             dim = length bs
             es = map mke [1 .. dim]
             delta i j = if i == j then 1 else 0
-            mke i = EL $ V.generate dim (delta (i-1)) -- numbering from zero
+            mke i = EL $ V.buildVector dim (delta (i-1)) -- numbering from zero
         in  Basis $ zip es bs
 
 
-
-instance (VectorSpace v, HasBasis v, RealFrac (Scalar v), Show (Scalar v)) 
+instance (VectorSpace v, HasBasis v, Show (BasisType v),
+          RealFrac (Scalar v), Show (Scalar v)) 
             => Show (Elem v) where
     show v = 
         let bs = canonical :: Basis v
@@ -92,16 +93,15 @@ instance (VectorSpace v, HasBasis v, RealFrac (Scalar v), Show (Scalar v))
                   [] -> " 0"
                   ss -> concat ss
 
+instance (VectorSpace v, Eq (Scalar v), Storable (Scalar v)) => Eq (Elem v) where
+    EL v == EL w = v == w
+
 -- TENSOR PRODUCTS
 -- Now we can do the tensor product thing.
 data Tensor v w
-tensor :: (HasBasis v, HasBasis w, HasBasis (Tensor v w), Scalar v ~ Scalar w, Num(Scalar v))
+tensor :: (V.Product (Scalar v), Scalar v ~ Scalar w)
        => Elem v -> Elem w -> Elem (Tensor v w)
-tensor v w = 
-    let vs  = coefficients canonical v
-        ws  = coefficients canonical w
-        vws = [ vsc * wsc | vsc <- vs, wsc <- ws ]
-    in  foldr1 plus $ map (uncurry scale) $ zip vws (elements canonical)
+tensor (EL v) (EL w) = EL $ V.flatten $ V.outer v w
 
 instance (Span v, Span w) => Span (Tensor v w) where
     type Scalar (Tensor v w)  = Scalar v
@@ -110,7 +110,7 @@ instance (Span v, Span w) => Span (Tensor v w) where
 
 instance (Show (BasisType v), Show (BasisType w))
     => Show (BasisType (Tensor v w)) where
-    show (BTensor bv bw) = show bv ++ "\x2297 " ++ show bw
+    show (BTensor bv bw) = show bv ++ " \x2297 " ++ show bw
 
 instance (Eq (BasisType v), Eq (BasisType w))
     => Eq (BasisType (Tensor v w)) where
@@ -119,18 +119,14 @@ instance (Eq (BasisType v), Eq (BasisType w))
 -- HOM SPACES
 -- embody the hom space as a vector space
 data Hom v w
-hom :: (HasBasis v, HasBasis w, HasBasis (Hom v w), Scalar v ~ Scalar w, Num(Scalar v))
+hom :: (V.Product (Scalar v), Scalar v ~ Scalar w)
        => Elem v -> Elem w -> Elem (Hom v w)
-hom v w = 
-    let vs  = coefficients canonical v
-        ws  = coefficients canonical w
-        vws = [ vsc * wsc | vsc <- vs, wsc <- ws ]
-    in  foldr1 plus $ map (uncurry scale) $ zip vws (elements canonical)
+hom (EL v) (EL w) = EL $ V.flatten $ V.outer w v
 
 instance (Span v, Span w) => Span (Hom v w) where
     type Scalar (Hom v w)  = Scalar v
     data BasisType  (Hom v w)  = BHom (BasisType v) (BasisType w)
-    basis = [BHom bv bw | bv <- basis, bw <- basis]
+    basis = [BHom bv bw | bw <- basis, bv <- basis]
 
 instance (Show (BasisType v), Show (BasisType w))
     => Show (BasisType (Hom v w)) where
@@ -140,34 +136,23 @@ instance (Eq (BasisType v), Eq (BasisType w))
     => Eq (BasisType (Hom v w)) where
     BHom bv bw == BHom bv' bw' = bv == bv' && bw == bw'
 
-apply :: (Span v, Span w, Scalar v ~ Scalar w,
-          V.Unbox (Scalar w), Num (Scalar w)) 
+apply :: (Span v, Span w, Scalar v ~ Scalar w, V.Product (Scalar v)) 
       => Elem (Hom v w) -> Elem v -> Elem w
-apply f v = 
-    let EL fe = f -- length fe = dv * dw
-        EL ve = v -- length ve = dv
-        dv = V.length ve
-        m i = V.foldr1 (+) $ V.zipWith (*) ve (V.slice i (i + dv) fe)
-        res = V.generate (V.length fe `div` dv) m
-    in  EL res
+apply (EL f) (EL v) = EL $ (V.reshape (V.dim v) f) `V.mXv` v 
 
 -- materialise a linear map into a Hom element
-materialise :: (Span v, Span w, Scalar v ~ Scalar w, 
-                Num (Scalar w), V.Unbox (Scalar w), 
-                Show (BasisType v), Eq (BasisType v),
-                Show (BasisType w), Eq (BasisType w)) 
+materialise :: (Span v, Span w, Scalar v ~ Scalar w, V.Product (Scalar w),
+                V.Container V.Vector (Scalar v))
             => (BasisType v -> Elem w) -> Elem (Hom v w)
 materialise f = 
     let fv = map f basis
         v  = elements canonical
-    in  foldr1 plus . map (uncurry hom) $ zip v fv
+    in  foldl1 plus . map (uncurry hom) $ zip v fv
 
 
 -- We can define linear maps by extending the map from a basis
 extend :: (Span v, Span w, Scalar v ~ Scalar w, 
-           Num (Scalar w), V.Unbox (Scalar w), 
-           Show (BasisType w), Eq (BasisType w),
-           Show (BasisType v), Eq (BasisType v)) 
+           V.Product (Scalar v), V.Container V.Vector (Scalar v))
        => (BasisType v -> Elem w) -> Elem v -> Elem w
 extend f = apply (materialise f)
 
