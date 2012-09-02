@@ -8,37 +8,35 @@ import Vector
 import Text.Printf
 import Data.List
 
-data H  -- identity
+data H = E | I | J | K deriving (Eq, Ord)
 
 instance Span H where
     type Scalar H = Double
-    data BasisType H  = E | I | J | K deriving Eq
-    basis = [E, I, J, K]
+    canonical = [E, I, J, K]
 
-instance Show (BasisType H) where
+instance Show H where
     show E = "e"
     show I = "i"
     show J = "j"
     show K = "k"
 
-e,i,j,k :: Elem H
-[e,i,j,k] = canonical
+[e,i,j,k] = map embed (canonical :: [H]) :: [Elem H]
 
 mu :: Elem (Tensor H H) -> Elem H
 mu = extend mu'
   where
-    mu' :: BasisType (Tensor H H) -> Elem H
-    mu' (BTensor E b) = embed b
-    mu' (BTensor b E) = embed b
-    mu' (BTensor I J) = k
-    mu' (BTensor J K) = i
-    mu' (BTensor K I) = j
-    mu' (BTensor J I) = minus k
-    mu' (BTensor K J) = minus i
-    mu' (BTensor I K) = minus j
-    mu' (BTensor I I) = minus e
-    mu' (BTensor J J) = minus e
-    mu' (BTensor K K) = minus e
+    mu' :: Tensor H H -> Elem H
+    mu' (Tensor E b) = embed b
+    mu' (Tensor b E) = embed b
+    mu' (Tensor I J) = k
+    mu' (Tensor J K) = i
+    mu' (Tensor K I) = j
+    mu' (Tensor J I) = minus k
+    mu' (Tensor K J) = minus i
+    mu' (Tensor I K) = minus j
+    mu' (Tensor I I) = minus e
+    mu' (Tensor J J) = minus e
+    mu' (Tensor K K) = minus e
 
 instance Algebra H where
     unit    = e
@@ -49,22 +47,38 @@ instance Algebra (Tensor H H) where
     unit = e `tensor` e
     mul x y = extend muHH (x `tensor` y)
             where 
-                muHH  (BTensor (BTensor x y) (BTensor x' y')) 
+                muHH  (Tensor (Tensor x y) (Tensor x' y')) 
                     = ((embed x) * (embed x')) `tensor` ((embed y') * (embed y))
 
 comm a b = a * b - b * a
-ehh = canonical :: [Elem (Tensor H H)]
+ehh = elements :: [Elem (Tensor H H)]
 
-sym = [ x `tensor` y + y `tensor` x | x <- canonical, y <- canonical, x <= y ] :: [Elem (Tensor H H)]
+sym = [ x `tensor` y + y `tensor` x 
+      | x <- elements, y <- elements, x <= y ] 
+        :: [Elem (Tensor H H)]
 
-ske = [ x `tensor` y - y `tensor` x | x <- canonical, y <- canonical, x < y ] :: [Elem (Tensor H H)]
+ske = [ x `tensor` y - y `tensor` x 
+      | x <- elements, y <- elements, x < y ] 
+        :: [Elem (Tensor H H)]
 
 showProd a b = 
-    [ (printf "[%18s ,%18s ] = " (show x) (show y))  ++ show (comm x y) | x <- a, y <- b, x < y]
+    [ (printf "[%18s ,%18s ] = " (show x) (show y))  ++ show (comm x y) 
+        | x <- a, y <- b, x < y]
 
-elms = [comm x y | x <- ehh, y <- ehh, x < y]
--- elms = [ printf "[%15s,%15s] = %-15s" (show x) (show y) (show (comm x y)) 
---        | x <- ehh, y <- ehh ]
+
+-- Create a new more convenient basis for H Tensor H
+-- Need to give names, and elements
+-- Then, expand arbitary elements in the new basis
+-- data TauBasis = Sym H H | Skew H H
+-- instance IsBasis TauBasis (Tensor H H) where
+--     basis =  [ Sym  a b | a <- [E,I,J,K], b <- [E,I,J,K], a <= b]
+--           ++ [ Skew a b | a <- [E,I,J,K], b <- [E,I,J,K], a < b]
+-- 
+-- instance Show TauBasis where
+--     show (Sym  a b) = show a ++ "\x2228" ++ show b
+--     show (Skew a b) = show a ++ "\x2227" ++ show b
+
+
 
 
 

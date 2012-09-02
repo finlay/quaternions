@@ -4,7 +4,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {- LANGUAGE TypeOperators #-}
-{- LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {- LANGUAGE DataKinds #-}
 {- LANGUAGE TypeSynonymInstances #-}
 {- LANGUAGE NoMonomorphismRestriction #-}
@@ -14,8 +14,6 @@ module Vector where
 
 import           Data.List (elemIndex)
 
---import Data.Array.Repa
---import qualified Data.Vector.Unboxed as V
 import qualified Data.Packed.Vector as V
 import qualified Numeric.Container as V
 import           Foreign.Storable (Storable)
@@ -23,8 +21,7 @@ import           Foreign.Storable (Storable)
 -- Hold the types together 
 class Span v where
     type Scalar v :: *
-    data BasisType v :: *
-    basis :: [BasisType v]
+    canonical :: [v]
 
 class Span v => VectorSpace v where
     data Elem v :: *
@@ -37,7 +34,7 @@ instance (V.Element (Scalar v), V.Container V.Vector (Scalar v),
           Num (Scalar v), Span v) 
     => VectorSpace v where
     newtype Elem v = EL { unEL :: V.Vector (Scalar v) }
-    zero                 = let bs = basis :: [BasisType v]
+    zero                 = let bs = canonical :: [v]
                            in  EL $ V.constant 0 (length bs) 
     minus (EL v)         = EL $ V.scale (-1) v
     plus  (EL v) (EL w)  = EL $ V.add v w
@@ -47,37 +44,31 @@ instance (Ord (Scalar v), Span v, V.Element (Scalar v), V.Container V.Vector (Sc
     => Ord (Elem v) where
     compare (EL v) (EL w) = compare v w
 
--- Bases are encoded depending on the particular structure of v
-class VectorSpace v => HasBasis v where
-    embed         :: (Eq (BasisType v), Show (BasisType v)) 
-                  => BasisType v -> Elem v
-    canonical     :: [Elem v]
-    coefficients  :: Elem v -> [Scalar v]
+class Basis b where
+    type VS b :: *
+    basis    :: [b]
+    embed    :: (Eq b, VectorSpace (VS b)) => b -> Elem (VS b)
+    elements :: (Eq (VS b), VectorSpace (VS b)) => [Elem (VS b)]
+    elements  = map embed basis
 
-instance (V.Product (Scalar v), V.Container V.Vector (Scalar v), Span v)
-    => HasBasis v where
+instance (V.Product (Scalar v), V.Container V.Vector (Scalar v), 
+          Span v , a ~  v, Show v)
+    => Basis v where
+    type VS v = v
+    basis = canonical
     embed b = 
-        let bs = basis :: [BasisType v]
+        let bs = canonical :: [v]
             delta i j = if i == j then 1 else 0
-        in case elemIndex b basis of
+        in case elemIndex b bs of
             Just i  -> EL $ V.buildVector (length bs) (delta i)
             Nothing -> error $ "Element " ++ show b ++ " not in basis?"
-    coefficients (EL e) = V.toList e
-    canonical = 
-        let bs = basis :: [BasisType v]
-            dim = length bs
-            es = map mke [1 .. dim]
-            delta i j = if i == j then 1 else 0
-            mke i = EL $ V.buildVector dim (delta (i-1)) -- numbering from zero
-        in  es 
 
-
-instance (VectorSpace v, HasBasis v, Show (BasisType v),
-          RealFrac (Scalar v), Show (Scalar v)) 
+instance (VectorSpace v, Show v, RealFrac (Scalar v), 
+            Show (Scalar v), Storable (Scalar v)) 
             => Show (Elem v) where
     show v = 
-        let bs = basis :: [BasisType v]
-            coef = coefficients v
+        let bs = canonical :: [v]
+            coef = V.toList $ unEL  v
             pairs = zip (map show bs) coef 
             showPair (b, n) 
                | n == 1.0    = " + "                  ++ b
@@ -96,62 +87,57 @@ instance (VectorSpace v, Eq (Scalar v), Storable (Scalar v)) => Eq (Elem v) wher
 
 -- TENSOR PRODUCTS
 -- Now we can do the tensor product thing.
-data Tensor v w
+data Tensor v w = Tensor v w
 tensor :: (V.Product (Scalar v), Scalar v ~ Scalar w)
        => Elem v -> Elem w -> Elem (Tensor v w)
 tensor (EL v) (EL w) = EL $ V.flatten $ V.outer v w
 
 instance (Span v, Span w) => Span (Tensor v w) where
     type Scalar (Tensor v w)  = Scalar v
-    data BasisType  (Tensor v w)  = BTensor (BasisType v) (BasisType w)
-    basis = [BTensor bv bw | bv <- basis, bw <- basis]
+    canonical = [Tensor bv bw | bv <- canonical, bw <- canonical]
 
-instance (Show (BasisType v), Show (BasisType w))
-    => Show (BasisType (Tensor v w)) where
-    show (BTensor bv bw) = show bv ++ " \x2297 " ++ show bw
+instance (Show v, Show w) => Show (Tensor v w) where
+    show (Tensor bv bw) = show bv ++ " \x2297 " ++ show bw
 
-instance (Eq (BasisType v), Eq (BasisType w))
-    => Eq (BasisType (Tensor v w)) where
-    BTensor bv bw == BTensor bv' bw' = bv == bv' && bw == bw'
+instance (Eq v, Eq w) => Eq (Tensor v w) where
+    Tensor bv bw == Tensor bv' bw' = bv == bv' && bw == bw'
 
 -- HOM SPACES
 -- embody the hom space as a vector space
-data Hom v w
+data Hom v w = Hom v w
 hom :: (V.Product (Scalar v), Scalar v ~ Scalar w)
        => Elem v -> Elem w -> Elem (Hom v w)
 hom (EL v) (EL w) = EL $ V.flatten $ V.outer w v
 
 instance (Span v, Span w) => Span (Hom v w) where
     type Scalar (Hom v w)  = Scalar v
-    data BasisType  (Hom v w)  = BHom (BasisType v) (BasisType w)
-    basis = [BHom bv bw | bw <- basis, bv <- basis]
+    canonical = [Hom bv bw | bw <- canonical, bv <- canonical]
 
-instance (Show (BasisType v), Show (BasisType w))
-    => Show (BasisType (Hom v w)) where
-    show (BHom bv bw) = show bv ++ " \x21A6 " ++ show bw
+instance (Show v, Show w) => Show (Hom v w) where
+    show (Hom bv bw) = show bv ++ " \x21A6 " ++ show bw
 
-instance (Eq (BasisType v), Eq (BasisType w))
-    => Eq (BasisType (Hom v w)) where
-    BHom bv bw == BHom bv' bw' = bv == bv' && bw == bw'
+instance (Eq v, Eq w) => Eq (Hom v w) where
+    Hom bv bw == Hom bv' bw' = bv == bv' && bw == bw'
 
 apply :: (Span v, Span w, Scalar v ~ Scalar w, V.Product (Scalar v)) 
       => Elem (Hom v w) -> Elem v -> Elem w
 apply (EL f) (EL v) = EL $ (V.reshape (V.dim v) f) `V.mXv` v 
 
 -- materialise a linear map into a Hom element
-materialise :: (Span v, Span w, Scalar v ~ Scalar w, V.Product (Scalar w),
+materialise :: (Span v, Span w, Scalar v ~ Scalar w, Show v, Eq v,
+                Basis v, V.Product (Scalar w),
                 V.Container V.Vector (Scalar v))
-            => (BasisType v -> Elem w) -> Elem (Hom v w)
+            => (v -> Elem w) -> Elem (Hom v w)
 materialise f = 
     let fv = map f basis
-        v  = canonical
-    in  foldl1 plus . map (uncurry hom) $ zip v fv
+        v  = map embed basis
+    in  foldr1 plus . map (uncurry hom) $ zip v fv
 
 
 -- We can define linear maps by extending the map from a basis
-extend :: (Span v, Span w, Scalar v ~ Scalar w, 
+extend :: (Span v, Span w, Scalar v ~ Scalar w, Basis v, Show v, Eq v,
            V.Product (Scalar v), V.Container V.Vector (Scalar v))
-       => (BasisType v -> Elem w) -> Elem v -> Elem w
+       => (v -> Elem w) -> Elem v -> Elem w
 extend f = apply (materialise f)
 
 
