@@ -1,10 +1,10 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{- LANGUAGE TypeOperators #-}
+{- LANGUAGE MultiParamTypeClasses #-}
 {- LANGUAGE DataKinds #-}
 {- LANGUAGE TypeSynonymInstances #-}
 {- LANGUAGE NoMonomorphismRestriction #-}
@@ -26,7 +26,6 @@ class Span v where
     data BasisType v :: *
     basis :: [BasisType v]
 
-
 class Span v => VectorSpace v where
     data Elem v :: *
     zero   :: Elem v
@@ -44,43 +43,42 @@ instance (V.Element (Scalar v), V.Container V.Vector (Scalar v),
     plus  (EL v) (EL w)  = EL $ V.add v w
     scale n (EL v)       = EL $ V.scale n v
 
+instance (Ord (Scalar v), Span v, V.Element (Scalar v), V.Container V.Vector (Scalar v))
+    => Ord (Elem v) where
+    compare (EL v) (EL w) = compare v w
+
 -- Bases are encoded depending on the particular structure of v
 class VectorSpace v => HasBasis v where
-    data Basis v :: *
-    embed         :: (Eq (BasisType v), Show (BasisType v)) => BasisType v -> Elem v
-    canonical     :: Basis v 
-    elements      :: Basis v -> [Elem v]
-    labels        :: Show (BasisType v) => Basis v -> [String]
-    coefficients  :: Basis v -> Elem v -> [Scalar v]
+    embed         :: (Eq (BasisType v), Show (BasisType v)) 
+                  => BasisType v -> Elem v
+    canonical     :: [Elem v]
+    coefficients  :: Elem v -> [Scalar v]
 
 instance (V.Product (Scalar v), V.Container V.Vector (Scalar v), Span v)
     => HasBasis v where
-    data Basis v = Basis [(Elem v, BasisType v)] 
     embed b = 
         let bs = basis :: [BasisType v]
             delta i j = if i == j then 1 else 0
         in case elemIndex b basis of
             Just i  -> EL $ V.buildVector (length bs) (delta i)
             Nothing -> error $ "Element " ++ show b ++ " not in basis?"
-    elements (Basis bs) = map fst bs
-    labels   (Basis bs) = map (show . snd) bs 
-    coefficients b (EL e) = map (V.dot e . unEL) (elements b)
+    coefficients (EL e) = V.toList e
     canonical = 
         let bs = basis :: [BasisType v]
             dim = length bs
             es = map mke [1 .. dim]
             delta i j = if i == j then 1 else 0
             mke i = EL $ V.buildVector dim (delta (i-1)) -- numbering from zero
-        in  Basis $ zip es bs
+        in  es 
 
 
 instance (VectorSpace v, HasBasis v, Show (BasisType v),
           RealFrac (Scalar v), Show (Scalar v)) 
             => Show (Elem v) where
     show v = 
-        let bs = canonical :: Basis v
-            coef = coefficients bs v
-            pairs = zip (labels bs) coef 
+        let bs = basis :: [BasisType v]
+            coef = coefficients v
+            pairs = zip (map show bs) coef 
             showPair (b, n) 
                | n == 1.0    = " + "                  ++ b
                | n == -1.0   = " - "                  ++ b
@@ -146,7 +144,7 @@ materialise :: (Span v, Span w, Scalar v ~ Scalar w, V.Product (Scalar w),
             => (BasisType v -> Elem w) -> Elem (Hom v w)
 materialise f = 
     let fv = map f basis
-        v  = elements canonical
+        v  = canonical
     in  foldl1 plus . map (uncurry hom) $ zip v fv
 
 
