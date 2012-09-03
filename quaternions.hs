@@ -69,14 +69,19 @@ showProd a b =
 -- Create a new more convenient basis for H Tensor H
 -- Need to give names, and elements
 -- Then, expand arbitary elements in the new basis
--- data TauBasis = Sym H H | Skew H H
--- instance IsBasis TauBasis (Tensor H H) where
---     basis =  [ Sym  a b | a <- [E,I,J,K], b <- [E,I,J,K], a <= b]
---           ++ [ Skew a b | a <- [E,I,J,K], b <- [E,I,J,K], a < b]
--- 
--- instance Show TauBasis where
---     show (Sym  a b) = show a ++ "\x2228" ++ show b
---     show (Skew a b) = show a ++ "\x2227" ++ show b
+data TauBasis = Sym H H | Skew H H
+-- instance Basis TauBasis where
+--     type VS TauBasis = Tensor H H
+basisT = [ Sym  a a | a <- [E,I,J,K]]
+      ++ [ Sym  E a | a <- [I,J,K]]
+      ++ [ Sym  a b | a <- [I,J,K], b <- [I,J,K], a < b]
+      ++ [ Skew a b | a <- [E,I,J,K], b <- [E,I,J,K], a < b]
+embedT (Sym  a b) = (embed a) `tensor` (embed b) + (embed b) `tensor` (embed a)
+embedT (Skew a b) = (embed a) `tensor` (embed b) - (embed b) `tensor` (embed a)
+
+instance Show TauBasis where
+    show (Sym  a b) = show a ++ " \x2228 " ++ show b
+    show (Skew a b) = show a ++ " \x2227 " ++ show b
 
 
 
