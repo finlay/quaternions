@@ -1,7 +1,10 @@
+{-# LANGUAGE TupleSections #-}
+
 module Extensive where
 
-type R = Double
+import Control.Monad (join)
 
+type R = Double
 newtype V a = V { unV :: ((a -> R) -> R) }
 
 instance Monad V where
@@ -11,13 +14,31 @@ instance Monad V where
 instance Functor V where 
     fmap f (V xs) = V $ xs . (flip ((flip id) . f))
 
-u x y = (x,y)
 
-t'' (x, y) = fmap (u x) y
+tensor :: V a -> V a -> V (a, a)
+tensor tx ty =  (join . (fmap t') . t'') (tx, ty)
+    where
+        t'' (x, y) = fmap (x,) y
+        t'  (x, y) = fmap (,y) x
 
-
+class FiniteSet x where 
+    elements :: [ x ]
 data H = E | I | J | K deriving (Eq, Ord, Show)
+instance FiniteSet H where elements = [ E, I, J, K ]
 
+instance (FiniteSet x, FiniteSet y) => FiniteSet (x,y) where
+    elements = [ (a,b) | a <- elements, b <- elements ]
+
+delta :: (Eq x) => x -> x -> R
+delta a b = if a == b then 1 else 0
+
+coef :: (FiniteSet x, Eq x) => V x -> [R]
+coef v = map (unV v . delta ) elements
+
+e = return E :: V H
+i = return I :: V H
+j = return J :: V H
+k = return K :: V H
 
 
 
