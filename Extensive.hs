@@ -4,7 +4,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-
 module Extensive where
 
 import Control.Monad (join)
@@ -20,14 +19,16 @@ instance Functor V where
     fmap f (V xs) = V $ xs . (flip ((flip id) . f))
 
 
+-- Tensor products are just pairs
+data Tensor a b = Tensor a b
 tensor :: V a -> V b -> V (Tensor a b)
 tensor tx ty =  (fmap (\(x,y) -> Tensor x y) . join . (fmap t') . t'') (tx, ty)
     where
         t'' (x, y) = fmap (x,) y
         t'  (x, y) = fmap (,y) x
 
-data Tensor a b = Tensor a b
 
+-- Finite sets can be listed in their elements
 class FiniteSet x where elements :: [ x ]
 instance (FiniteSet x, FiniteSet y) => FiniteSet (Tensor x y) where
     elements = [ Tensor a b | a <- elements, b <- elements ]
@@ -41,6 +42,13 @@ instance (Eq x, Eq y) => Eq (Tensor x y) where
 instance (Ord x, Ord y) => Ord (Tensor x y) where
     Tensor x y <= Tensor x' y' = x <= x' && y <= y'
 
+delta :: (Eq x) => x -> x -> R
+delta a b = if a == b then 1 else 0
+
+-- If we have a vector over a finite set, we can calculate the coefficients
+coefficients :: (FiniteSet x, Eq x) => V x -> [(x, R)]
+coefficients (V v) = map (\e -> (e, v (delta e))) elements
+
 instance (Eq a, FiniteSet a) => Eq (V a) where
     x == y = (coefficients x) == (coefficients y)
 
@@ -49,9 +57,6 @@ instance (Eq a, FiniteSet a, Ord a) => Ord (V a) where
 
 extend :: (Monad m) => (a -> m b) -> m a -> m b
 extend = flip (>>=)
-
-delta :: (Eq x) => x -> x -> R
-delta a b = if a == b then 1 else 0
 
 -- Basis
 class Basis b x where
@@ -62,9 +67,6 @@ class Basis b x where
 -- canonical basis
 instance (Eq x) => Basis x x where
     eta = delta
-
-coefficients :: (FiniteSet x, Eq x) => V x -> [(x, R)]
-coefficients (V v) = map (\e -> (e, v (delta e))) elements
 
 showInBasis :: (Show b, Eq b, Basis b x) 
             => [b] -> V x -> String
@@ -92,13 +94,13 @@ zero :: V a
 zero = V $ \_ -> 0
 
 minus :: V a -> V a
-minus (V x) = V $ \f -> - (x f)
+minus (V x) = V $ negate . x 
 
 plus :: V a -> V a -> V a
 plus (V x) (V y) = V $ (\ar -> x ar + y ar)
 
 scale :: R  -> V a -> V a
-scale r (V x) = V $(\ar -> r * (x ar))
+scale r (V x) = V $ (r *) . x 
 
 -- ALGEBRAS (Associative)
 class Algebra x where

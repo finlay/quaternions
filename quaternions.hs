@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 import Text.Printf
+import Data.List (unfoldr)
 
 import Extensive
 
@@ -8,10 +9,8 @@ import Extensive
 data H = E | I | J | K deriving (Eq, Ord)
 instance FiniteSet H where elements = [ E, I, J, K ]
 instance Show H where
-    show E = "e"
-    show I = "i"
-    show J = "j"
-    show K = "k"
+    show E = "e" ; show I = "i"
+    show J = "j" ; show K = "k"
 
 [e,i,j,k] = map return elements :: [V H]
 
@@ -46,13 +45,17 @@ instance Algebra (V (Tensor H H)) where
 comm a b = a * b - b * a
 ehh = map return elements :: [V (Tensor H H)]
 
-sym0 = [ x `tensor` x  | x <- [e,i,j,k]]
-sym1 = [ (e `tensor` x + x `tensor` e) | x <- [i,j,k]]
-sym2 = [ j `tensor` k + k `tensor` j, k `tensor` i + i `tensor` k, i `tensor` j + j `tensor` i]
+sym0 = map (scale 0.5) $ [ x `tensor` x  | x <- [e,i,j,k]]
+sym1 = map (scale 0.5) $ [ e `tensor` x + x `tensor` e | x <- [i,j,k]]
+sym2 = map (scale 0.5) $ [ j `tensor` k + k `tensor` j, 
+                           k `tensor` i + i `tensor` k, 
+                           i `tensor` j + j `tensor` i ]
 sym = sym0 ++ sym1 ++ sym2
 
-ske1 = [ (e `tensor` x - x `tensor` e) | x <- [i,j,k]]
-ske2 = [ j `tensor` k - k `tensor` j, k `tensor` i - i `tensor` k, i `tensor` j - j `tensor` i]
+ske1 = map (scale 0.5) $ [ e `tensor` x - x `tensor` e | x <- [i,j,k]]
+ske2 = map (scale 0.5) $ [ j `tensor` k - k `tensor` j, 
+                           k `tensor` i - i `tensor` k, 
+                           i `tensor` j - j `tensor` i ]
 ske = ske1 ++ ske2
 
 
@@ -83,12 +86,17 @@ instance FiniteSet TauBasis where
 
 instance Basis TauBasis (Tensor H H) where
     --eta   :: TauBasis -> (Tensor H H) -> R
-    eta (Sym  a b) (Tensor x y) = 0.5 * (delta a x * delta b y + delta b x * delta a y)
-    eta (Skew a b) (Tensor x y) = 0.5 * (delta a x * delta b y - delta b x * delta a y)
+    eta (Sym  a b) (Tensor x y) = (delta a x * delta b y + delta b x * delta a y)
+    eta (Skew a b) (Tensor x y) = (delta a x * delta b y - delta b x * delta a y)
 
 tau = elements :: [TauBasis]
 
 
+-- Lets see how one element acts
+--checkElement :: V x -> V x -> String
+checkElement a b = 
+    let bs = unfoldr (\b' -> let b'' = comm a b' in if b == b'' || b'' == 0 then Nothing else Just (b'', b'')) b 
+    in  bs
 
 
 
