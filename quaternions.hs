@@ -91,6 +91,15 @@ instance Basis TauBasis (Tensor H H) where
 
 tau = elements :: [TauBasis]
 
+injectTau :: V TauBasis -> V (Tensor H H)
+injectTau = extend injectTau'
+  where
+    injectTau' (Sym  x y) =  let x' = return x 
+                                 y' = return y
+                             in  scale 0.5 (x' `tensor` y' + y' `tensor` x')
+    injectTau' (Skew x y) =  let x' = return x 
+                                 y' = return y
+                             in  scale 0.5 (x' `tensor` y' - y' `tensor` x')
 
 -- Lets see how one element acts
 --checkElement :: V x -> V x -> String

@@ -59,8 +59,11 @@ extend = flip (>>=)
 
 
 -- want to allow the creation of inverses 
-inverse :: (V a -> V b) -> Either String (V b -> V a)
-inverse lm = Left "Not implemented"
+inverse :: (FiniteSet a, FiniteSet b) 
+        => (V a -> V b) -> Maybe (V b -> V a)
+inverse lm = Nothing
+
+
 
 
 -- Don't really want to use this basis stuff.....
