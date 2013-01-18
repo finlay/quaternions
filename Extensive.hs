@@ -20,7 +20,7 @@ instance Functor V where
 
 
 -- Tensor products are just pairs
-data Tensor a b = Tensor a b
+data Tensor a b = Tensor a b deriving (Eq, Ord)
 tensor :: V a -> V b -> V (Tensor a b)
 tensor tx ty =  (fmap (\(x,y) -> Tensor x y) . join . (fmap t') . t'') (tx, ty)
     where
@@ -28,19 +28,14 @@ tensor tx ty =  (fmap (\(x,y) -> Tensor x y) . join . (fmap t') . t'') (tx, ty)
         t'  (x, y) = fmap (,y) x
 
 
--- Finite sets can be listed in their elements
+-- Finite sets can be listed, which is elements
 class FiniteSet x where elements :: [ x ]
+
 instance (FiniteSet x, FiniteSet y) => FiniteSet (Tensor x y) where
     elements = [ Tensor a b | a <- elements, b <- elements ]
 
 instance (Show x, Show y) => Show (Tensor x y) where
     show (Tensor x y) = show x ++ " \x2297 " ++ show y
-
-instance (Eq x, Eq y) => Eq (Tensor x y) where
-    Tensor x y == Tensor x' y' = x == x' && y == y'
-
-instance (Ord x, Ord y) => Ord (Tensor x y) where
-    Tensor x y <= Tensor x' y' = x <= x' && y <= y'
 
 delta :: (Eq x) => x -> x -> R
 delta a b = if a == b then 1 else 0
@@ -55,8 +50,21 @@ instance (Eq a, FiniteSet a) => Eq (V a) where
 instance (Eq a, FiniteSet a, Ord a) => Ord (V a) where
     compare x y = compare (coefficients x) (coefficients y)
 
+
+-- Now we can talk about maps
+-- Extending a map into a the Vector space is easy peasy using the Monad instance
+-- Automatically linear
 extend :: (Monad m) => (a -> m b) -> m a -> m b
 extend = flip (>>=)
+
+
+-- want to allow the creation of inverses 
+inverse :: (V a -> V b) -> Either String (V b -> V a)
+inverse lm = Left "Not implemented"
+
+
+-- Don't really want to use this basis stuff.....
+-- Instead just use the linear maps stuff above
 
 -- Basis
 class Basis b x where
