@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 import Text.Printf
 import Data.List (unfoldr)
+import Data.Maybe (fromJust)
 
 import Extensive
 
@@ -45,6 +46,48 @@ instance Algebra (V (Tensor H H)) where
 comm a b = a * b - b * a
 ehh = map return elements :: [V (Tensor H H)]
 
+-- Create a new more convenient basis for H Tensor H
+-- Need to give names, and elements
+-- Then, expand arbitary elements in the new basis
+data TauBasis = Sym H H | Skew H H deriving (Ord, Eq)
+instance Show TauBasis where
+    show (Sym  a b) = show a ++ " \x2228 " ++ show b
+    show (Skew a b) = show a ++ " \x2227 " ++ show b
+
+instance FiniteSet TauBasis where
+    elements =  [ Sym  a a | a <- [E,I,J,K]]
+             ++ [ Sym  E a | a <- [I,J,K]]
+             ++ [ Sym  J K , Sym  K I, Sym  I J]
+             ++ [ Skew E a | a <- [I,J,K]]
+             ++ [ Skew J K , Skew K I, Skew I J]
+
+instance Basis TauBasis (Tensor H H) where
+    --eta   :: TauBasis -> (Tensor H H) -> R
+    eta (Sym  a b) (Tensor x y) = (delta a x * delta b y + delta b x * delta a y)
+    eta (Skew a b) (Tensor x y) = (delta a x * delta b y - delta b x * delta a y)
+
+tau = map return elements :: [V TauBasis]
+
+injectTau :: V TauBasis -> V (Tensor H H)
+injectTau = extend injectTau'
+  where
+    injectTau' (Sym  x y) =  let x' = return x 
+                                 y' = return y
+                             in  scale 0.5 (x' `tensor` y' + y' `tensor` x')
+    injectTau' (Skew x y) =  let x' = return x 
+                                 y' = return y
+                             in  scale 0.5 (x' `tensor` y' - y' `tensor` x')
+
+injectTauInv = fromJust $ inverse injectTau
+
+-- Lets see how one element acts
+--checkElement :: V x -> V x -> String
+checkElement a b = 
+    let bs = unfoldr (\b' -> let b'' = comm a b' in if b == b'' || b'' == 0 then Nothing else Just (b'', b'')) b 
+    in  bs
+
+
+
 sym0 = map (scale 0.5) $ [ x `tensor` x  | x <- [e,i,j,k]]
 sym1 = map (scale 0.5) $ [ e `tensor` x + x `tensor` e | x <- [i,j,k]]
 sym2 = map (scale 0.5) $ [ j `tensor` k + k `tensor` j, 
@@ -68,45 +111,28 @@ showProdInBasis bs xs ys =
     in  [ (printf "[%10s ,%10s ] = " (sh x) (sh y))  ++ sh (comm x y) 
             | x <- xs, y <- ys]
 
+test =
+  let as = map show tau
+      bs = map (show . injectTau) tau
+  in  mapM_ (putStrLn . uncurry (printf "%10s -> %-10s")) (zip as bs) 
 
--- Create a new more convenient basis for H Tensor H
--- Need to give names, and elements
--- Then, expand arbitary elements in the new basis
-data TauBasis = Sym H H | Skew H H deriving (Ord, Eq)
-instance Show TauBasis where
-    show (Sym  a b) = show a ++ " \x2228 " ++ show b
-    show (Skew a b) = show a ++ " \x2227 " ++ show b
-
-instance FiniteSet TauBasis where
-    elements =  [ Sym  a a | a <- [E,I,J,K]]
-             ++ [ Sym  E a | a <- [I,J,K]]
-             ++ [ Sym  J K , Sym  K I, Sym  I J]
-             ++ [ Skew E a | a <- [I,J,K]]
-             ++ [ Skew J K , Skew K I, Skew I J]
-
-instance Basis TauBasis (Tensor H H) where
-    --eta   :: TauBasis -> (Tensor H H) -> R
-    eta (Sym  a b) (Tensor x y) = (delta a x * delta b y + delta b x * delta a y)
-    eta (Skew a b) (Tensor x y) = (delta a x * delta b y - delta b x * delta a y)
-
-tau = elements :: [TauBasis]
-
-injectTau :: V TauBasis -> V (Tensor H H)
-injectTau = extend injectTau'
-  where
-    injectTau' (Sym  x y) =  let x' = return x 
-                                 y' = return y
-                             in  scale 0.5 (x' `tensor` y' + y' `tensor` x')
-    injectTau' (Skew x y) =  let x' = return x 
-                                 y' = return y
-                             in  scale 0.5 (x' `tensor` y' - y' `tensor` x')
-
--- Lets see how one element acts
---checkElement :: V x -> V x -> String
-checkElement a b = 
-    let bs = unfoldr (\b' -> let b'' = comm a b' in if b == b'' || b'' == 0 then Nothing else Just (b'', b'')) b 
-    in  bs
-
+test2 =
+  let as = map show ehh
+      bs = map (show . injectTauInv) ehh
+  in  mapM_ (putStrLn . uncurry (printf "%10s -> %-10s")) (zip as bs) 
+    
+test3 =
+  let as = map show ehh
+      bs = map (show . injectTauInv) ehh
+      cs = map (show . injectTau . injectTauInv) ehh
+  in  mapM_ (\(a,b,c) -> putStrLn $ (printf "%-10s -> %-25s -> %-25s" a b c)) (zip3 as bs cs) 
+    
+test4 =
+  let as = map show tau
+      bs = map (show . injectTau) tau
+      cs = map (show . injectTauInv . injectTau) tau
+  in  mapM_ (\(a,b,c) -> putStrLn $ (printf "%-10s -> %-25s -> %-25s" a b c)) (zip3 as bs cs) 
+    
 
 
 

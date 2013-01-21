@@ -57,11 +57,24 @@ instance (Eq a, FiniteSet a, Ord a) => Ord (V a) where
 extend :: (Monad m) => (a -> m b) -> m a -> m b
 extend = flip (>>=)
 
+codual :: (FiniteSet a, Eq a) => V a -> (a -> R)
+codual (V x)  = x . delta
+
+dual :: (FiniteSet a, Eq a) => (a -> R) -> V a
+dual x = V (dual' x)
+  where 
+    dual' x y = 
+      let co e = (+ ((x e) * (y e)))
+      in  foldr co 0.0 elements
+
+dot :: (Eq a, FiniteSet a) => V a -> V a -> R
+dot (V y) = y . codual
 
 -- want to allow the creation of inverses 
-inverse :: (FiniteSet a, FiniteSet b) 
+-- assume that the linear map is isometric!
+inverse :: (FiniteSet a, FiniteSet b, Eq a, Eq b) 
         => (V a -> V b) -> Maybe (V b -> V a)
-inverse lm = Nothing
+inverse lm = Just $ dual . flip (unV . lm . return) . codual
 
 
 
