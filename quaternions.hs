@@ -54,17 +54,18 @@ instance Show TauBasis where
     show (Sym  a b) = show a ++ " \x2228 " ++ show b
     show (Skew a b) = show a ++ " \x2227 " ++ show b
 
-instance FiniteSet TauBasis where
-    elements =  [ Sym  a a | a <- [E,I,J,K]]
-             ++ [ Sym  E a | a <- [I,J,K]]
-             ++ [ Sym  J K , Sym  K I, Sym  I J]
-             ++ [ Skew E a | a <- [I,J,K]]
-             ++ [ Skew J K , Skew K I, Skew I J]
+sym0 = [ Sym  a a | a <- [E,I,J,K]]
+sym1 = [ Sym  E a | a <- [I,J,K]]
+sym2 = [ Sym  J K , Sym  K I, Sym  I J]
+ske1 = [ Skew E a | a <- [I,J,K]]
+ske2 = [ Skew J K , Skew K I, Skew I J]
 
-instance Basis TauBasis (Tensor H H) where
-    --eta   :: TauBasis -> (Tensor H H) -> R
-    eta (Sym  a b) (Tensor x y) = (delta a x * delta b y + delta b x * delta a y)
-    eta (Skew a b) (Tensor x y) = (delta a x * delta b y - delta b x * delta a y)
+instance FiniteSet TauBasis where
+    elements =  sym0 ++ sym1 ++ sym2 ++ ske1 ++ ske2
+
+instance Algebra (V TauBasis) where
+    unit = return (Sym E E)
+    mul x y = injectTauInv ((injectTau x) * (injectTau y))
 
 tau = map return elements :: [V TauBasis]
 
@@ -78,7 +79,26 @@ injectTau = extend injectTau'
                                  y' = return y
                              in  scale 0.5 (x' `tensor` y' - y' `tensor` x')
 
-injectTauInv = fromJust $ inverse injectTau
+injectTauInv :: V (Tensor H H) -> V TauBasis
+--injectTauInv = fromJust $ inverse injectTau
+injectTauInv = extend injectTauInv'
+  where
+    injectTauInv' (E `Tensor` E) = return (Sym E E) 
+    injectTauInv' (I `Tensor` I) = return (Sym I I)
+    injectTauInv' (J `Tensor` J) = return (Sym J J)
+    injectTauInv' (K `Tensor` K) = return (Sym K K)
+    injectTauInv' (E `Tensor` I) = (return (Sym E I)) + (return (Skew E I))
+    injectTauInv' (I `Tensor` E) = (return (Sym E I)) - (return (Skew E I))
+    injectTauInv' (E `Tensor` J) = (return (Sym E J)) + (return (Skew E J))
+    injectTauInv' (J `Tensor` E) = (return (Sym E J)) - (return (Skew E J))
+    injectTauInv' (E `Tensor` K) = (return (Sym E K)) + (return (Skew E K))
+    injectTauInv' (K `Tensor` E) = (return (Sym E K)) - (return (Skew E K))
+    injectTauInv' (I `Tensor` J) = (return (Sym I J)) + (return (Skew I J))
+    injectTauInv' (J `Tensor` I) = (return (Sym I J)) - (return (Skew I J))
+    injectTauInv' (J `Tensor` K) = (return (Sym J K)) + (return (Skew J K))
+    injectTauInv' (K `Tensor` J) = (return (Sym J K)) - (return (Skew J K))
+    injectTauInv' (K `Tensor` I) = (return (Sym K I)) + (return (Skew K I))
+    injectTauInv' (I `Tensor` K) = (return (Sym K I)) - (return (Skew K I))
 
 -- Lets see how one element acts
 --checkElement :: V x -> V x -> String
@@ -87,29 +107,6 @@ checkElement a b =
     in  bs
 
 
-
-sym0 = map (scale 0.5) $ [ x `tensor` x  | x <- [e,i,j,k]]
-sym1 = map (scale 0.5) $ [ e `tensor` x + x `tensor` e | x <- [i,j,k]]
-sym2 = map (scale 0.5) $ [ j `tensor` k + k `tensor` j, 
-                           k `tensor` i + i `tensor` k, 
-                           i `tensor` j + j `tensor` i ]
-sym = sym0 ++ sym1 ++ sym2
-
-ske1 = map (scale 0.5) $ [ e `tensor` x - x `tensor` e | x <- [i,j,k]]
-ske2 = map (scale 0.5) $ [ j `tensor` k - k `tensor` j, 
-                           k `tensor` i - i `tensor` k, 
-                           i `tensor` j - j `tensor` i ]
-ske = ske1 ++ ske2
-
-
-showProd a b = 
-    [ (printf "[%18s ,%18s ] = " (show x) (show y))  ++ show (comm x y) 
-        | x <- a, y <- b, x < y]
-
-showProdInBasis bs xs ys = 
-    let sh = showInBasis bs
-    in  [ (printf "[%10s ,%10s ] = " (sh x) (sh y))  ++ sh (comm x y) 
-            | x <- xs, y <- ys]
 
 test =
   let as = map show tau
@@ -133,6 +130,10 @@ test4 =
       cs = map (show . injectTauInv . injectTau) tau
   in  mapM_ (\(a,b,c) -> putStrLn $ (printf "%-10s -> %-25s -> %-25s" a b c)) (zip3 as bs cs) 
     
-
+test5 as bs = 
+  let disp (x, y) = putStrLn $ (printf "[%-8s, %8s] = %-25s" (show x) (show y) (show (comm x y)))
+      as' = map return as :: [V TauBasis]
+      bs' = map return bs :: [V TauBasis]
+  in  mapM_ disp [(x,y) | x <- as', y <- bs']
 
 
