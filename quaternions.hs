@@ -151,3 +151,32 @@ test6 as bs =
       bs' = map return bs :: [V TauBasis]
       nonzero (x,y) = (killing x y) /= 0.0
   in  mapM_ disp $ filter nonzero [(x,y) | x <- as', y <- bs']
+
+-- Construct as Lie algebra
+
+-- Define a new set of generators, based on a few basics
+data SO3 = X | Y | Z deriving (Eq, Ord)
+instance FiniteSet SO3 where elements = [X, Y, Z]
+instance Show SO3
+    where show X = "x"
+          show Y = "y"
+          show Z = "z"
+
+
+[x, y, z] = map return elements :: [V SO3]
+
+instance Algebra (V SO3) where
+    unit    = undefined
+    mul x y = mmu (x `tensor` y)
+      where 
+        mmu :: V (Tensor SO3 SO3) -> V SO3
+        mmu = extend mmu'
+        mmu' (X `Tensor` X) = zero
+        mmu' (X `Tensor` Y) = return Z
+        mmu' (X `Tensor` Z) = minus (return Y)
+        mmu' (Y `Tensor` X) = minus (return Z)
+        mmu' (Y `Tensor` Y) = zero
+        mmu' (Y `Tensor` Z) = return X
+        mmu' (Z `Tensor` X) = return Y
+        mmu' (Z `Tensor` Y) = minus (return X)
+        mmu' (Z `Tensor` Z) = zero
