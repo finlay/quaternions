@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 import Text.Printf
 import Data.List (unfoldr)
@@ -136,4 +137,17 @@ test5 as bs =
       bs' = map return bs :: [V TauBasis]
   in  mapM_ disp [(x,y) | x <- as', y <- bs']
 
+-- Killing form
+killing :: (Algebra (V a), FiniteSet a, Eq a) => V a -> V a -> R
+killing x y = trace (ad x . ad y)
+  where
+    ad = comm 
+    trace f = sum $ map (diag f) elements
+    diag f e = coef (f (return e)) e
 
+test6 as bs = 
+  let disp (x, y) = putStrLn $ printf "B(%8s, %8s) = %s" (show x) (show y) (show (killing x y))
+      as' = map return as :: [V TauBasis]
+      bs' = map return bs :: [V TauBasis]
+      nonzero (x,y) = (killing x y) /= 0.0
+  in  mapM_ disp $ filter nonzero [(x,y) | x <- as', y <- bs']
