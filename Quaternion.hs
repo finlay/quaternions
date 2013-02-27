@@ -5,12 +5,15 @@ module Quaternion where
 
 import Data.List (unfoldr)
 import Data.Maybe (fromJust)
+import Test.QuickCheck hiding (elements)
+import qualified Test.QuickCheck as QC
 
 import Extensive
 
 
 data H = E | I | J | K deriving (Eq, Ord)
 instance FiniteSet H where elements = [ E, I, J, K ]
+instance Arbitrary H where arbitrary = QC.elements elements
 instance Show H where
     show E = "e" ; show I = "i"
     show J = "j" ; show K = "k"
@@ -51,8 +54,8 @@ ehh = map return elements :: [V (Tensor H H)]
 -- Create a new more convenient basis for H Tensor H
 -- Need to give names, and elements
 -- Then, expand arbitary elements in the new basis
-data TauBasis = Sym H H | Skew H H deriving (Ord, Eq)
-instance Show TauBasis where
+data Tau = Sym H H | Skew H H deriving (Ord, Eq)
+instance Show Tau where
     show (Sym  a b) = show a ++ " \x2228 " ++ show b
     show (Skew a b) = show a ++ " \x2227 " ++ show b
 
@@ -62,16 +65,17 @@ sym2 = [ Sym  J K , Sym  K I, Sym  I J]
 ske1 = [ Skew E a | a <- [I,J,K]]
 ske2 = [ Skew J K , Skew K I, Skew I J]
 
-instance FiniteSet TauBasis where
+instance FiniteSet Tau where
     elements =  sym0 ++ sym1 ++ sym2 ++ ske1 ++ ske2
+instance Arbitrary Tau where arbitrary = QC.elements elements
 
-instance Algebra (V TauBasis) where
+instance Algebra (V Tau) where
     unit = return (Sym E E)
     mul x y = injectTauInv ((injectTau x) * (injectTau y))
 
-tau = map return elements :: [V TauBasis]
+tau = map return elements :: [V Tau]
 
-injectTau :: V TauBasis -> V (Tensor H H)
+injectTau :: V Tau -> V (Tensor H H)
 injectTau = extend injectTau'
   where
     injectTau' (Sym  x y) =  let x' = return x 
@@ -81,7 +85,7 @@ injectTau = extend injectTau'
                                  y' = return y
                              in  scale 0.5 (x' `tensor` y' - y' `tensor` x')
 
-injectTauInv :: V (Tensor H H) -> V TauBasis
+injectTauInv :: V (Tensor H H) -> V Tau
 --injectTauInv = fromJust $ inverse injectTau
 injectTauInv = extend injectTauInv'
   where
@@ -127,6 +131,8 @@ instance Show SO3
     where show X = "x"
           show Y = "y"
           show Z = "z"
+
+instance Arbitrary SO3 where arbitrary = QC.elements elements
 
 
 [x, y, z] = map return elements :: [V SO3]
