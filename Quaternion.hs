@@ -3,7 +3,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Quaternion where
 
-import Text.Printf
 import Data.List (unfoldr)
 import Data.Maybe (fromJust)
 
