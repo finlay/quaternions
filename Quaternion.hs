@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+module Quaternion where
+
 import Text.Printf
 import Data.List (unfoldr)
 import Data.Maybe (fromJust)
@@ -109,34 +111,6 @@ checkElement a b =
 
 
 
-test =
-  let as = map show tau
-      bs = map (show . injectTau) tau
-  in  mapM_ (putStrLn . uncurry (printf "%10s -> %-10s")) (zip as bs) 
-
-test2 =
-  let as = map show ehh
-      bs = map (show . injectTauInv) ehh
-  in  mapM_ (putStrLn . uncurry (printf "%10s -> %-10s")) (zip as bs) 
-    
-test3 =
-  let as = map show ehh
-      bs = map (show . injectTauInv) ehh
-      cs = map (show . injectTau . injectTauInv) ehh
-  in  mapM_ (\(a,b,c) -> putStrLn $ (printf "%-10s -> %-25s -> %-25s" a b c)) (zip3 as bs cs) 
-    
-test4 =
-  let as = map show tau
-      bs = map (show . injectTau) tau
-      cs = map (show . injectTauInv . injectTau) tau
-  in  mapM_ (\(a,b,c) -> putStrLn $ (printf "%-10s -> %-25s -> %-25s" a b c)) (zip3 as bs cs) 
-    
-test5 as bs = 
-  let disp (x, y) = putStrLn $ (printf "[%-8s, %8s] = %-25s" (show x) (show y) (show (comm x y)))
-      as' = map return as :: [V TauBasis]
-      bs' = map return bs :: [V TauBasis]
-  in  mapM_ disp [(x,y) | x <- as', y <- bs']
-
 -- Killing form
 killing :: (Algebra (V a), FiniteSet a, Eq a) => V a -> V a -> R
 killing x y = trace (ad x . ad y)
@@ -144,13 +118,6 @@ killing x y = trace (ad x . ad y)
     ad = comm 
     trace f = sum $ map (diag f) elements
     diag f e = coef (f (return e)) e
-
-test6 as bs = 
-  let disp (x, y) = putStrLn $ printf "B(%8s, %8s) = %s" (show x) (show y) (show (killing x y))
-      as' = map return as :: [V TauBasis]
-      bs' = map return bs :: [V TauBasis]
-      nonzero (x,y) = (killing x y) /= 0.0
-  in  mapM_ disp $ filter nonzero [(x,y) | x <- as', y <- bs']
 
 -- Construct as Lie algebra
 
@@ -180,3 +147,6 @@ instance Algebra (V SO3) where
         mmu' (Z `Tensor` X) = return Y
         mmu' (Z `Tensor` Y) = minus (return X)
         mmu' (Z `Tensor` Z) = zero
+
+
+
