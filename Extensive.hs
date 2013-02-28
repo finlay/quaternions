@@ -7,8 +7,12 @@
 module Extensive where
 
 import Control.Monad (join)
+import Test.QuickCheck (Arbitrary)
+import qualified Test.QuickCheck as QC
 
-type R = Double
+
+type R = Rational ; epsilon = 0 -- slow and accurate
+--type R = Double ; epsilon = 1e-6 -- fast and approximate
 newtype V a = V { unV :: ((a -> R) -> R) }
 
 instance Monad V where
@@ -45,7 +49,10 @@ coefficients :: (FiniteSet x, Eq x) => V x -> [(x, R)]
 coefficients (V v) = map (\e -> (e, v (delta e))) elements
 
 instance (Eq a, FiniteSet a) => Eq (V a) where
-    x == y = (coefficients x) == (coefficients y)
+    x == y = sum (map (squared . snd) ( coefficients (subtract x y))) <= epsilon
+              where 
+                squared x = x * x
+                subtract (V x) (V y) = V $ (\ar -> x ar - y ar)
 
 instance (Eq a, FiniteSet a, Ord a) => Ord (V a) where
     compare x y = compare (coefficients x) (coefficients y)
@@ -130,6 +137,16 @@ scale r (V x) = V $ (r *) . x
 class Algebra x where
     unit :: x
     mul  :: x -> x -> x
+
+
+instance (Arbitrary a, Algebra (V a)) => Arbitrary (V a)
+  where
+    arbitrary = 
+      do
+        bs   <- QC.listOf1 QC.arbitrary
+        coef <- QC.vector (length bs)
+        return $ foldl1 (+) $ map (\(n,b) -> scale n (return b)) $ zip coef bs
+
 
 -- Working around the terrible Num class here
 instance Algebra (V v) => Num (V v) where

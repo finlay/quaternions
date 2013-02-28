@@ -3,8 +3,7 @@
 
 import Text.Printf
 import Data.List
-import Test.QuickCheck (Arbitrary)
-import qualified Test.QuickCheck as QC
+import Test.QuickCheck hiding (elements)
 
 import Quaternion
 import Extensive
@@ -17,20 +16,14 @@ so3 = extend so3'
     so3' Z = return $ Skew E K
 
 
-instance (Arbitrary a, Algebra (V a)) => Arbitrary (V a)
-  where
-    arbitrary = 
-      do
-        bs   <- QC.listOf1 QC.arbitrary
-        coef <- QC.vector (length bs)
-        return $ foldl1 (+) $ map (\(n,b) -> scale n (return b)) $ zip coef bs
-
-prop_so3_lie_algebra_homomorphism :: V SO3 -> V SO3 -> QC.Property
+prop_so3_lie_algebra_homomorphism :: V SO3 -> V SO3 -> Property
 prop_so3_lie_algebra_homomorphism a b = 
-    QC.property $ so3 (a * b) == comm (so3 b) (so3 a)
+    property $ so3 (a * b) == comm (so3 b) (so3 a)
 
 
-main = test5 ske2 ske1
+main =  do
+    --test5 elements elements
+    quickCheck prop_so3_lie_algebra_homomorphism
 
 test7 = do
     let xs = map return elements :: [V SO3]
