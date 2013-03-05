@@ -4,6 +4,7 @@
 import Text.Printf
 import Data.List
 import Test.QuickCheck hiding (elements)
+import Text.PrettyPrint.Boxes
 
 import Quaternion
 import Extensive
@@ -23,7 +24,21 @@ prop_so3_lie_algebra_homomorphism a b =
 
 main =  do
     --test5 elements elements
-    quickCheck prop_so3_lie_algebra_homomorphism
+    test8 (map return (sym0 ++ ske1 ++ ske2) :: [V Tau]) comm
+    --quickCheck prop_so3_lie_algebra_homomorphism
+
+data Hole = Hole
+
+test8 es pr = printBox box
+  where
+    box = hsep 2 left cols
+    topleft = emptyBox 1 5
+    cols  = first : body
+    first =   vsep 0 left  ( topleft : map ts es)
+    body  = [ vsep 0 right ( ts e :    col e) | e <- es]
+    col e = [ ts (pr e f) | f <- es ]
+    ts = text . show
+    
 
 test7 = do
     let xs = map return elements :: [V SO3]

@@ -11,8 +11,8 @@ import Test.QuickCheck (Arbitrary)
 import qualified Test.QuickCheck as QC
 
 
-type R = Rational ; epsilon = 0 -- slow and accurate
---type R = Double ; epsilon = 1e-6 -- fast and approximate
+--type R = Rational ; epsilon = 0 -- slow and accurate
+type R = Double ; epsilon = 1e-6 -- fast and approximate
 newtype V a = V { unV :: ((a -> R) -> R) }
 
 instance Monad V where
