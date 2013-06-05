@@ -13,8 +13,7 @@ import qualified Test.QuickCheck as QC
 
 --type R = Rational ; epsilon = 0 -- slow and accurate
 type R = Double ; epsilon = 1e-6 -- fast and approximate
-
-
+show' r = show $ if abs r < epsilon then 0 else r
 newtype V a = V { unV :: ((a -> R) -> R) }
 
 instance Functor V where 
@@ -79,11 +78,17 @@ dual x = V (dual' x)
 dot :: (Eq a, FiniteSet a) => V a -> V a -> R
 dot (V y) = y . codual
 
+-- Transpose
+transpose :: (FiniteSet a, FiniteSet b, Eq a, Eq b) 
+          => (V a -> V b) -> (V b -> V a)
+transpose lm = dual . flip (unV . lm . return) . codual
+
+
 -- want to allow the creation of inverses 
 -- assume that the linear map is isometric!
 inverse :: (FiniteSet a, FiniteSet b, Eq a, Eq b) 
         => (V a -> V b) -> Maybe (V b -> V a)
-inverse lm = Just $ dual . flip (unV . lm . return) . codual
+inverse lm = Just $ transpose lm
 
 
 
