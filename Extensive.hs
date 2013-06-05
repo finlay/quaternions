@@ -13,14 +13,16 @@ import qualified Test.QuickCheck as QC
 
 --type R = Rational ; epsilon = 0 -- slow and accurate
 type R = Double ; epsilon = 1e-6 -- fast and approximate
+
+
 newtype V a = V { unV :: ((a -> R) -> R) }
+
+instance Functor V where 
+    fmap f (V xs) = V $ xs . (flip ((flip id) . f))
 
 instance Monad V where
     return x      = V $ flip id x
     (V x) >>= y   = V $ x . flip ( unV . y )
-
-instance Functor V where 
-    fmap f (V xs) = V $ xs . (flip ((flip id) . f))
 
 
 -- Tensor products are just pairs
