@@ -24,12 +24,14 @@ instance Show Matrix where
 -- Make a rotation with given angle in xy plane
 theta :: R
 theta = 12.3*pi
-r :: R -> V SO3 -> V SO3
-r t = extend r'
+
+r :: SO3 -> SO3 -> R -> V SO3 -> V SO3
+r a b t = extend r'
   where 
-    r' X =  (scale (cos t) x) + (scale (sin t) y)
-    r' Y = -(scale (sin t) x) + (scale (cos t) y)
-    r' Z = z
+    r' :: SO3 -> V SO3 
+    r' i | a == i  =  (scale (cos t) (return a)) + (scale (sin t) (return b))
+         | b == i  = -(scale (sin t) (return a)) + (scale (cos t) (return b))
+         | otherwise  = return i
 
 
 -- Make a random matrix
@@ -52,6 +54,7 @@ randomMatrix =
     return $ extend m'
 
 main = do 
+    
     -- Generate random three by three linear transformation
     a <- randomMatrix
     putStrLn "A = "
