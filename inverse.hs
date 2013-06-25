@@ -1,5 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE BangPatterns #-}
 
 import Text.Printf
 import Data.List hiding (transpose)
@@ -13,13 +15,15 @@ import Extensive
 
 -- Matrix type for 3 x 3 matricies
 type Matrix = V SO3 -> V SO3 
-instance Show Matrix where
-  show m = render box
+mkBox :: Matrix -> Box
+mkBox m = box
       where
         es = map return elements :: [ V SO3 ]
         box = hsep 2 left cols
         cols  = [ vsep 0 right (map (ts . snd) (coefficients (m e))) | e <- es]
         ts = text . show'
+instance Show Matrix where
+  show = render . mkBox
 
 -- Make a rotation with given angle in xy plane
 theta :: R
@@ -33,6 +37,40 @@ r a b t = extend r'
          | b == i  = -(scale (sin t) (return a)) + (scale (cos t) (return b))
          | otherwise  = return i
 
+
+-- Given an off diagonal element, cacluate the angle
+angle :: R -> R
+angle ct = 
+    let sgn a = a / abs a
+    in atan $ (sgn ct) / ((abs ct) + (sqrt (1 + ct*ct)))
+
+makeRotation :: Matrix -> SO3 -> SO3 -> Matrix
+makeRotation m x y = 
+    let mc a b = unV (m (return a)) (delta b)
+        ct = ((mc x x) - (mc y y)) / (2*(mc x y))
+    in  r x y (angle ct)
+
+-- Diagonalise a symmetric matrix
+offdiag = [ (x, y) | x <- elements, y <- elements, x < y] :: [(SO3, SO3)]
+diagonaliseSym :: Matrix -> [(Matrix, Matrix)]
+diagonaliseSym = unfoldr diag . (, id)
+  where 
+    diag :: (Matrix, Matrix) -> Maybe ((Matrix, Matrix), (Matrix, Matrix))
+    diag (!m, !t) =       
+        let mc a b = unV (m (return a)) (delta b)
+            nonzero (x, y) = abs (mc x y) > epsilon
+            nonzeros = filter nonzero offdiag
+        in case nonzeros of 
+            []      -> Nothing
+            (x,y):_ -> 
+                let  !t' = makeRotation m x y
+                     !m' = (transpose t') . m . t'
+                in   Just ((m', t . t'), (m', t . t'))
+    
+offNorm :: Matrix -> R
+offNorm m = 
+  let mc a b = unV (m (return a)) (delta b)
+   in sum $ map ((**2) . uncurry mc) offdiag
 
 -- Make a random matrix
 randomElement :: IO (V SO3)
@@ -58,19 +96,20 @@ main = do
     -- Generate random three by three linear transformation
     a <- randomMatrix
     putStrLn "A = "
-    putStrLn $ show a
+    print a
     
     -- Calculate two transposes A^TA and AA^T
     let ata = transpose a . a
     putStrLn "A^TA = "
-    putStrLn $ show ata
+    print ata
 
     let aat = a. transpose a
     putStrLn "AA^T = "
-    putStrLn $ show aat
+    print aat
 
     -- For each of those, caclulate rotations
-
+    forM_ (take 15 $ diagonaliseSym ata) $ \( m, t) ->
+        do  putStrLn $ render $ hsep 3 left [(mkBox m),  (mkBox t)]
 
     -- Put it all together
 
