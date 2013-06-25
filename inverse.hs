@@ -115,29 +115,5 @@ main = do
 
     putStrLn "Done"
 
-{- 
- - # Calculating the inverse of a random linear transformation
- - 
- - Harder than it might seem.
- -
- - Plan is to follow the SVD decomposition. So that means, factoring out
- - orthogonal transformtions before and after, which leaves only a diagonal
- - matrix in the middle.
- -
- - Let A be a linear transformation.
- - Looking for V and W, orthogonal, and D diagonal, such that
- -   A = V D W
- -
- - Note that 
- -   A^TA = W^TD^TDW = W^T D^2 W
- - and similarly,
- -   AA^T = V D^2 V^T
- - 
- - which are both symmetric. What that means is that we can decompose to get V
- - and W separately, and simultaneously.
- -
- - If we can find a sequence of 
- -
- --}
 
 
