@@ -25,6 +25,13 @@ mkBox m = box
 instance Show Matrix where
   show = render . mkBox
 
+-- Need to collapse matrix multiplication some how
+mmul :: Matrix -> Matrix -> Matrix
+mmul a b = extend ab
+  where
+    ab :: SO3 -> V SO3
+    ab  = a . b . return
+
 -- Make a rotation with given angle in xy plane
 theta :: R
 theta = 12.3*pi
@@ -50,27 +57,49 @@ makeRotation m x y =
         ct = ((mc x x) - (mc y y)) / (2*(mc x y))
     in  r x y (angle ct)
 
+-- Diagonal element
+data Diag = Diag !SO3 !SO3 deriving (Eq, Show)
+offdiag :: [ Diag ]
+offdiag = [ Diag x y | x <- elements, y <- elements, x < y]
+
+diagStep :: Diag -> Matrix -> (Matrix, Matrix)
+diagStep (Diag r s) m = 
+        let !t' = makeRotation m r s
+            !m' = (transpose t') `mmul` m `mmul` t'
+        in (m', t')
+
 -- Diagonalise a symmetric matrix
-offdiag = [ (x, y) | x <- elements, y <- elements, x < y] :: [(SO3, SO3)]
 diagonaliseSym :: Matrix -> [(Matrix, Matrix)]
-diagonaliseSym = unfoldr diag . (, id)
-  where 
-    diag :: (Matrix, Matrix) -> Maybe ((Matrix, Matrix), (Matrix, Matrix))
-    diag (!m, !t) =       
-        let mc a b = unV (m (return a)) (delta b)
-            nonzero (x, y) = abs (mc x y) > epsilon
-            nonzeros = filter nonzero offdiag
-        in case nonzeros of 
-            []      -> Nothing
-            (x,y):_ -> 
-                let  !t' = makeRotation m x y
-                     !m' = (transpose t') . m . t'
-                in   Just ((m', t . t'), (m', t . t'))
+diagonaliseSym = 
+  let dds = foldr1 (++) (repeat offdiag ) 
+  in  go dds [] . (, id)
+  where
+    go ds res (m, t) = 
+        let (d:ds') = ds 
+            (t', m') = diagStep d m
+            res' = res ++ [(m', t')]
+        in if   offNorm m' < epsilon 
+           then res'
+           else go ds' res' (m', t')
+
+--
+--  where 
+--    diag :: (Matrix, Matrix) -> Maybe ((Matrix, Matrix), (Matrix, Matrix))
+--    diag (!m, !t) =       
+--        let mc a b = unV (m (return a)) (delta b)
+--            nonzero (x, y) = abs (mc x y) > epsilon
+--            nonzeros = filter nonzero offdiag
+--        in case nonzeros of 
+--            []      -> Nothing
+--            (x,y):_ -> 
+--                let  !t' = makeRotation m x y
+--                     !m' = (transpose t') . m . t'
+--                in   Just ((m', t . t'), (m', t . t'))
     
 offNorm :: Matrix -> R
 offNorm m = 
-  let mc a b = unV (m (return a)) (delta b)
-   in sum $ map ((**2) . uncurry mc) offdiag
+  let mc (Diag a b) = unV (m (return a)) (delta b)
+   in sum $ map ((**2) . mc) offdiag
 
 -- Make a random matrix
 randomElement :: IO (V SO3)
@@ -99,16 +128,16 @@ main = do
     print a
     
     -- Calculate two transposes A^TA and AA^T
-    let ata = transpose a . a
+    let ata = transpose a `mmul` a
     putStrLn "A^TA = "
     print ata
 
-    let aat = a. transpose a
+    let aat = a `mmul` transpose a
     putStrLn "AA^T = "
     print aat
 
     -- For each of those, caclulate rotations
-    forM_ (take 15 $ diagonaliseSym ata) $ \( m, t) ->
+    forM_ (take 2 $ diagonaliseSym ata) $ \( m, t) ->
         do  putStrLn $ render $ hsep 3 left [(mkBox m),  (mkBox t)]
 
     -- Put it all together
