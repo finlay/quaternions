@@ -76,7 +76,8 @@ codual :: (Eq a) => V a -> (a -> R)
 codual (V x)  = x . delta
 
 dual :: (FiniteSet a, Eq a) => (a -> R) -> V a
-dual x = foldl1 plus $ map (\e -> scale (x e) (return e))  elements
+--dual x = foldl1 plus $ map (\e -> scale (x e) (return e))  elements
+dual x = V (\y -> sum $ map (\e -> x e * y e) elements)
 
 dot :: (Eq a, FiniteSet a) => V a -> V a -> R
 dot (V y) = y . codual
