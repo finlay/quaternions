@@ -16,6 +16,8 @@ import qualified Test.QuickCheck as QC
 --type R = Rational ; epsilon = 0 -- slow and accurate
 type R = Double ; epsilon = 1e-6 -- fast and approximate
 show' r = printf "%0.4f" $ if abs r < epsilon then 0 else r
+
+
 newtype V a = V { unV :: ((a -> R) -> R) }
 
 instance Functor V where 
@@ -51,6 +53,9 @@ delta a b = if a == b then 1 else 0
 coefficients :: (FiniteSet x, Eq x) => V x -> [(x, R)]
 coefficients (V v) = map (\e -> (e, v (delta e))) elements
 
+instance (Eq a, FiniteSet a) => Eq (a -> R) where
+    x == y = all (\e -> x e == y e) elements
+
 instance (Eq a, FiniteSet a) => Eq (V a) where
     x == y = sum (map (squared . snd) ( coefficients (subtract x y))) <= epsilon
               where 
@@ -67,15 +72,11 @@ instance (Eq a, FiniteSet a, Ord a) => Ord (V a) where
 extend :: (Monad m) => (a -> m b) -> m a -> m b
 extend = flip (>>=)
 
-codual :: (FiniteSet a, Eq a) => V a -> (a -> R)
+codual :: (Eq a) => V a -> (a -> R)
 codual (V x)  = x . delta
 
 dual :: (FiniteSet a, Eq a) => (a -> R) -> V a
-dual x = V (dual' x)
-  where 
-    dual' x y = 
-      let co e = (+ ((x e) * (y e)))
-      in  foldr co 0.0 elements
+dual x = foldl1 plus $ map (\e -> scale (x e) (return e))  elements
 
 dot :: (Eq a, FiniteSet a) => V a -> V a -> R
 dot (V y) = y . codual
