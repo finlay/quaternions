@@ -82,19 +82,6 @@ diagonaliseSym =
            then res'
            else go ds' res' (m', t')
 
---
---  where 
---    diag :: (Matrix, Matrix) -> Maybe ((Matrix, Matrix), (Matrix, Matrix))
---    diag (!m, !t) =       
---        let mc a b = unV (m (return a)) (delta b)
---            nonzero (x, y) = abs (mc x y) > epsilon
---            nonzeros = filter nonzero offdiag
---        in case nonzeros of 
---            []      -> Nothing
---            (x,y):_ -> 
---                let  !t' = makeRotation m x y
---                     !m' = (transpose t') . m . t'
---                in   Just ((m', t . t'), (m', t . t'))
     
 offNorm :: Matrix -> R
 offNorm m = 
