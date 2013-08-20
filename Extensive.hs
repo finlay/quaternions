@@ -72,6 +72,12 @@ so, we have em :: (a, b) -> V a -> V b
 
 --}
 
+em :: (Eq a) => (a, b) -> V a -> V b  
+em (x,y) (V vx) = V $ (vx . (em' (x, y)))
+  where
+    em' (x,y) vy = \x' -> if x' == x then vy y else 0
+
+
 -- Finite sets can be listed, which is elements
 class FiniteSet x where elements :: [ x ]
 
