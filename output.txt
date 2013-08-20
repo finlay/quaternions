@@ -1,0 +1,23 @@
+           + e ∨ e    + i ∨ i    + j ∨ j    + k ∨ k           + e ∧ i           + e ∧ j           + e ∧ k           + j ∨ k           + k ∨ i           + i ∨ j
+ + e ∨ e         0          0          0          0                 0                 0                 0                 0                 0                 0
+ + i ∨ i         0          0          0          0                 0          + 2k ∨ i          - 2i ∨ j                 0          + 2e ∧ j          - 2e ∧ k
+ + j ∨ j         0          0          0          0          - 2j ∨ k                 0          + 2i ∨ j          - 2e ∧ i                 0          + 2e ∧ k
+ + k ∨ k         0          0          0          0          + 2j ∨ k          - 2k ∨ i                 0          + 2e ∧ i          - 2e ∧ j                 0
+ + e ∧ i         0          0   + 2j ∨ k   - 2j ∨ k                 0           + e ∧ k           - e ∧ j   - j ∨ j + k ∨ k           - i ∨ j           + k ∨ i
+ + e ∧ j         0   - 2k ∨ i          0   + 2k ∨ i           - e ∧ k                 0           + e ∧ i           + i ∨ j   + i ∨ i - k ∨ k           - j ∨ k
+ + e ∧ k         0   + 2i ∨ j   - 2i ∨ j          0           + e ∧ j           - e ∧ i                 0           - k ∨ i           + j ∨ k   - i ∨ i + j ∨ j
+ + j ∨ k         0          0   + 2e ∧ i   - 2e ∧ i   + j ∨ j - k ∨ k           - i ∨ j           + k ∨ i                 0           + e ∧ k           - e ∧ j
+ + k ∨ i         0   - 2e ∧ j          0   + 2e ∧ j           + i ∨ j   - i ∨ i + k ∨ k           - j ∨ k           - e ∧ k                 0           + e ∧ i
+ + i ∨ j         0   + 2e ∧ k   - 2e ∧ k          0           - k ∨ i           + j ∨ k   + i ∨ i - j ∨ j           + e ∧ j           - e ∧ i                 0
+ +++ 
+           + e ∨ e    + i ∨ i    + j ∨ j    + k ∨ k           + e ∨ i           + e ∨ j           + e ∨ k           + j ∧ k           + k ∧ i           + i ∧ j
+ + e ∨ e         0          0          0          0                 0                 0                 0                 0                 0                 0
+ + i ∨ i         0          0          0          0                 0          - 2k ∧ i          - 2i ∧ j                 0          - 2e ∨ j          - 2e ∨ k
+ + j ∨ j         0          0          0          0          - 2j ∧ k                 0          - 2i ∧ j          - 2e ∨ i                 0          - 2e ∨ k
+ + k ∨ k         0          0          0          0          - 2j ∧ k          - 2k ∧ i                 0          - 2e ∨ i          - 2e ∨ j                 0
+ + e ∨ i         0          0   + 2j ∧ k   + 2j ∧ k                 0           + e ∧ k           - e ∧ j   - j ∨ j - k ∨ k           + i ∨ j           + k ∨ i
+ + e ∨ j         0   + 2k ∧ i          0   + 2k ∧ i           - e ∧ k                 0           + e ∧ i           + i ∨ j   - i ∨ i - k ∨ k           + j ∨ k
+ + e ∨ k         0   + 2i ∧ j   + 2i ∧ j          0           + e ∧ j           - e ∧ i                 0           + k ∨ i           + j ∨ k   - i ∨ i - j ∨ j
+ + j ∧ k         0          0   + 2e ∨ i   + 2e ∨ i   + j ∨ j + k ∨ k           - i ∨ j           - k ∨ i                 0           - e ∧ k           + e ∧ j
+ + k ∧ i         0   + 2e ∨ j          0   + 2e ∨ j           - i ∨ j   + i ∨ i + k ∨ k           - j ∨ k           + e ∧ k                 0           - e ∧ i
+ + i ∧ j         0   + 2e ∨ k   + 2e ∨ k          0           - k ∨ i           - j ∨ k   + i ∨ i + j ∨ j           - e ∧ j           + e ∧ i                 0
