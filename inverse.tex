@@ -1,0 +1,62 @@
+\documentclass{article}
+\usepackage{amsmath}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+Inverse algorithm based on the double dual form of a vector space.
+
+Let a vector space be formed as the type:
+\[ V a :: a \to R \to R \]
+
+This data type has a natural monad instance. Linear maps are a sub type of:
+\[ LM a b :: V a \to V b \]
+
+In fact, we can use the bind instance to construct linear maps as:
+\begin{align*}
+    extend &:: (Monad m) => (a \to m b) \to m a \to m b \\
+    extend &= flip (>>=) 
+\end{align*}
+In particular, we have that:
+\[  extend :: (a \to V b) \to LM a b \]
+
+To extract an othogonal map out of a linear map, we need to look for a
+off diagonal aspect, and add extract out a corresponding rotation. 
+
+Example:
+Let $A$ and $B$ be finite sets of size $n$ and $m$ respectively:
+\begin{align*}
+    A &= \{a_i \mid i \in 1 .. n \} \\
+    B &= \{b_i \mid i \in 1 .. m \} \\
+\end{align*}
+
+Then a linear map $l \in LM A B$ is given by:
+\[ l(a_i) = \sum_j l_i^j b_j \]
+
+What we want to do is align the linear map to the basis on $B$. In this way
+decompose $l$ into $ l = d \circ o$ where $o : V A \to V A$ is orthogonal and $d
+: V A \to V B $ is diagonal.
+
+For any element $x \in V b$ we can calculate a couple of useful functions:
+\begin{align*}
+   \mathrm{mix}\ x  &= \{ b \mid b \in B, x\ \delta_b > 0 \} \\
+   \mathrm{size}\ x &= \| \mathrm{mix}\ x \|
+\end{align*}
+
+Now we can define what it means for $d :: V a \to V b$ to be diagonal: $d$ is diagonal if 
+\begin{itemize}
+    \item $\forall a \in A : \mathrm{size}\ d a = 1$
+    \item $\forall a,a' \in A: \mathrm{mix}\ d a \cap \mathrm{mix}\ d a' = \phi $
+\end{itemize}
+
+% let l :: V A \to V B ( :: LM A B )
+% let alreadyDiagonal = [] 
+% For each a in A:
+%   compute: bs = coef ( l a )
+%   if length bs = 1
+%   then for (b', c) in bs:
+%     if b' in alreadyDiagonal
+%       then do 
+%              r = createrotation a c'
+%              alreadyDiagonal add b'
+  
+\end{document}
