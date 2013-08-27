@@ -92,8 +92,13 @@ tensor tx ty =  (join . (fmap t') . t'') (Tensor tx ty)
 
 -- Hom represent linear maps.
 data Hom a b = Hom a b deriving (Eq, Ord)
-hom :: (V a -> V b) -> V (Hom a b)
-hom = undefined
+
+hom :: (FiniteSet a, FiniteSet b, Eq b) => (V a -> V b) -> V (Hom a b)
+hom l = 
+  let xs = elements
+      coef = coefficients . l . return
+  in  sum [scale c (return (Hom x y)) | x <- xs, (y,c) <- coef x]
+
 apply :: (Eq a) => V (Hom a b) -> V a -> V b
 apply l (V ex) = 
   let pi1 (Hom x y) = x  -- projection  1
@@ -109,16 +114,20 @@ em (Hom x y) (V vx) =
 
 
 
-
-
 -- Finite sets can be listed, which is elements
 class FiniteSet x where elements :: [ x ]
 
 instance (FiniteSet x, FiniteSet y) => FiniteSet (Tensor x y) where
     elements = [ Tensor a b | a <- elements, b <- elements ]
 
+instance (FiniteSet x, FiniteSet y) => FiniteSet (Hom x y) where
+    elements = [ Hom a b | a <- elements, b <- elements ]
+
 instance (Show x, Show y) => Show (Tensor x y) where
     show (Tensor x y) = show x ++ " \x2297 " ++ show y
+
+instance (Show x, Show y) => Show (Hom x y) where
+    show (Hom x y) = show x ++ " \x21A6 " ++ show y
 
 delta :: (Eq x) => x -> x -> R
 delta a b = if a == b then 1 else 0
