@@ -9,6 +9,11 @@ module Extensive where
 import Control.Monad (join)
 import Text.Printf
 
+import Numeric.Natural.Internal
+import Numeric.Algebra
+import Prelude hiding ((+), (-), (*), (^), negate, (>), (<), sum, fromInteger)
+import qualified Prelude
+
 import Test.QuickCheck (Arbitrary)
 import qualified Test.QuickCheck as QC
 
@@ -16,6 +21,54 @@ import qualified Test.QuickCheck as QC
 --type R = Rational ; epsilon = 0 -- slow and accurate
 type R = Double ; epsilon = 1e-6 -- fast and approximate
 show' r = printf "%0.4f" $ if abs r < epsilon then 0 else r
+
+instance Additive Double where
+  (+) = (Prelude.+)
+  --sinnum1p n r = (1 Prelude.+ toNatural n) * r
+
+instance Abelian Double
+
+orderOrd :: Ord a => a -> a -> Maybe Ordering
+orderOrd a b = Just (compare a b)
+instance Order Double where order = orderOrd 
+
+instance Division Double where
+  recip = Prelude.recip
+  (/) = (Prelude./)
+  (\\) = undefined -- not sure what this is supposed to be
+  (^) = (Prelude.^^)
+
+
+pow1pIntegral :: (Division r, Integral n) => r -> n -> r
+pow1pIntegral r n = r ^ (1 Prelude.+ n)
+instance Multiplicative Double where
+  (*) = (Prelude.*)
+  pow1p = pow1pIntegral
+
+instance Semiring Double
+
+instance LeftModule  Natural Double where (.*)   = (*) . fromIntegral
+instance LeftModule  Integer Double where (.*)   = (*) . fromIntegral
+instance RightModule Natural Double where m *. n = m * fromIntegral n
+instance RightModule Integer Double where m *. n = m * fromIntegral n
+
+instance Monoidal Double where 
+  zero = 0
+  sinnum n r = fromIntegral n * r
+
+instance Group Double where
+  (-) = (Prelude.-)
+  negate = Prelude.negate
+  subtract = Prelude.subtract
+  times n r = fromIntegral n * r
+
+instance Unital Double where one = 1
+
+fromNaturalNum :: Num r => Natural -> r
+fromNaturalNum (Natural n) = Prelude.fromInteger n
+instance Rig Double where fromNatural = fromNaturalNum
+
+instance Ring Double  where fromInteger = Prelude.fromInteger
 
 
 newtype V a = V { unV :: ((a -> R) -> R) }
@@ -153,8 +206,8 @@ instance (Eq a, FiniteSet a, Show a) => Show (V a) where
                showInCanonicalBasis = showInBasis 
            in  showInCanonicalBasis elements
 
-zero :: V a
-zero = V $ \_ -> 0
+instance Monoidal (V a) where
+    zero = V $ \_ -> 0
 
 minus :: V a -> V a
 minus (V x) = V $ negate . x 
@@ -162,31 +215,46 @@ minus (V x) = V $ negate . x
 plus :: V a -> V a -> V a
 plus (V x) (V y) = V $ (\ar -> x ar + y ar)
 
+instance LeftModule  Natural (V a) where n .* m = scale (fromIntegral n) m
+instance LeftModule  Integer (V a) where n .* m = scale (fromIntegral n) m
+instance RightModule Natural (V a) where m *. n = scale (fromIntegral n) m
+instance RightModule Integer (V a) where m *. n = scale (fromIntegral n) m
+
 scale :: R  -> V a -> V a
 scale r (V x) = V $ (r *) . x 
 
--- ALGEBRAS (Associative)
-class Algebra x where
-    unit :: x
-    mul  :: x -> x -> x
+instance Group (V a) where
+  x - y = plus x (minus y)
+  negate = minus
+  subtract x y = plus (minus x) y
+  times n r = scale (fromIntegral n) r
 
 
-instance (Arbitrary a, Algebra (V a)) => Arbitrary (V a)
-  where
-    arbitrary = 
-      do
-        bs   <- QC.listOf1 QC.arbitrary
-        coef <- QC.vector (length bs)
-        return $ foldl1 (+) $ map (\(n,b) -> scale n (return b)) $ zip coef bs
+instance Additive (V v) where
+    (+)   = plus 
+
+--  -- ALGEBRAS (Associative)
+--  class Algebra x where
+--      unit :: x
+--      mul  :: x -> x -> x
+--  
+--  
+--  instance (Arbitrary a, Algebra (V a)) => Arbitrary (V a)
+--    where
+--      arbitrary = 
+--        do
+--          bs   <- QC.listOf1 QC.arbitrary
+--          coef <- QC.vector (length bs)
+--          return $ foldl1 (+) $ map (\(n,b) -> scale n (return b)) $ zip coef bs
 
 
 -- Working around the terrible Num class here
-instance Algebra (V v) => Num (V v) where
-    (+) v w        = plus v w
-    (-) v w        = plus v (minus w)
-    negate w       = minus w
-    (*) v w        = mul v w
-    abs            = undefined
-    signum         = undefined
-    fromInteger i  = scale (fromInteger i) unit
-
+-- instance Algebra (V v) => Num (V v) where
+--     (+) v w        = plus v w
+--     (-) v w        = plus v (minus w)
+--     negate w       = minus w
+--     (*) v w        = mul v w
+--     abs            = undefined
+--     signum         = undefined
+--     fromInteger i  = scale (fromInteger i) unit
+-- 

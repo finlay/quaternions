@@ -5,6 +5,11 @@ module Quaternion where
 
 import Data.List (unfoldr)
 import Data.Maybe (fromJust)
+
+import Numeric.Algebra
+import Prelude hiding ((+), (-), (*), (^), negate, (>), (<), sum, fromInteger)
+import qualified Prelude
+
 import Test.QuickCheck hiding (elements)
 import qualified Test.QuickCheck as QC
 
@@ -36,14 +41,12 @@ mu = extend mu'
     mu' (J `Tensor` J) = minus e
     mu' (K `Tensor` K) = minus e
 
-instance Algebra (V H) where
-    unit    = e
-    mul x y = mu (x `tensor` y)
+instance Multiplicative (V H) where
+    (*) x y = mu (x `tensor` y)
 
 -- Now lets make Tensor H H an algebra
-instance Algebra (V (Tensor H H)) where
-    unit = e `tensor` e
-    mul x y = extend muHH (x `tensor` y)
+instance Multiplicative (V (Tensor H H)) where
+    (*) x y = extend muHH (x `tensor` y)
             where 
                 muHH  (Tensor (Tensor x y) (Tensor x' y')) 
                     = ((return x) * (return x')) `tensor` ((return y') * (return y))
@@ -69,9 +72,8 @@ instance FiniteSet Tau where
     elements =  sym0 ++ sym1 ++ sym2 ++ ske1 ++ ske2
 instance Arbitrary Tau where arbitrary = QC.elements elements
 
-instance Algebra (V Tau) where
-    unit = return (Sym E E)
-    mul x y = injectTauInv ((injectTau x) * (injectTau y))
+instance Multiplicative (V Tau) where
+    (*) x y = injectTauInv ((injectTau x) * (injectTau y))
 
 tau = map return elements :: [V Tau]
 
@@ -115,7 +117,7 @@ checkElement a b =
 
 
 -- Killing form
-killing :: (Algebra (V a), FiniteSet a, Eq a) => V a -> V a -> R
+killing :: (Multiplicative (V a), FiniteSet a, Eq a) => V a -> V a -> R
 killing x y = trace (ad x . ad y)
   where
     ad = comm 
@@ -137,9 +139,8 @@ instance Arbitrary SO3 where arbitrary = QC.elements elements
 
 [x, y, z] = map return elements :: [V SO3]
 
-instance Algebra (V SO3) where
-    unit    = undefined
-    mul x y = mmu (x `tensor` y)
+instance Multiplicative (V SO3) where
+    (*) x y = mmu (x `tensor` y)
       where 
         mmu :: V (Tensor SO3 SO3) -> V SO3
         mmu = extend mmu'
