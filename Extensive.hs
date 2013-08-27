@@ -31,10 +31,81 @@ instance Monad V where
 -- Tensor products are just pairs
 data Tensor a b = Tensor a b deriving (Eq, Ord)
 tensor :: V a -> V b -> V (Tensor a b)
-tensor tx ty =  (fmap (\(x,y) -> Tensor x y) . join . (fmap t') . t'') (tx, ty)
+tensor tx ty =  (join . (fmap t') . t'') (Tensor tx ty)
     where
-        t'' (x, y) = fmap (x,) y
-        t'  (x, y) = fmap (,y) x
+        t'' (Tensor x y) = fmap (Tensor x) y
+        t'  (Tensor x y) = fmap (flip Tensor y) x
+
+
+{- 
+ -  Want to make hom now.
+ -  Its a bit tricky! Basically because the linearity is not garanteed.
+ -}
+data Hom a b = Hom a b deriving (Eq, Ord)
+hom :: (V a -> V b) -> V (Hom a b)
+hom = undefined
+apply :: V (Hom a b) -> V a -> V b
+apply = undefined
+
+{- The hom function is not generally defined. It only works if the domiain function is 
+ - linear. Which we don't generally know is the case.
+ -
+ - The apply function is a bit easier. We have the function:
+ - em :: Hom a b -> V a -> V b
+ -
+ - Just need to extend it linearly over the whole of V (Hom a b) !
+ --}
+
+em :: (Eq a) => Hom a b -> V a -> V b
+em (Hom x y) (V vx) = 
+  let em' vy x' = if x == x' then vy y else 0
+  in  V $ vx . em'
+
+{- The thing is, we don't need to go from general (V a -> V b)
+ - but only from (a -> V b).
+ - Then we know its going to be linear
+ --}
+
+hom' :: (a -> V b) -> V (Hom a b)
+--     (a -> (b -> R) -> R) -> ((a, b) -> R) -> R
+--     {{ flip first argument }}
+--     ((b -> R) -> (a -> R)) -> ((a, b) -> R) -> R
+--
+--     ((a,b) -> R) -> ???? (b -> R) -> (a -> R)
+--
+--     Remember that a and b are Finite sets. So, a -> R == [R] of length a
+--     Then a map (b -> R) -> (a -> R) == [R] -> [R] (i.e., a matrix)
+--     
+--     Remember delta (aka eta)
+--     delta :: (Eq a) => a -> a -> R 
+--     delta x x' = if x == x' then 1 else 0 
+--     
+--     The (a,b) component of which is given by the value
+--     if 
+--       f :: (b -> R) -> (a -> R)
+--     then 
+--       f' :: (a, b) -> R
+--       f' (x, y) = f (delta y) x
+--
+--     So \f -> f' :: ((b -> R) -> (a -> R)) -> (a, b) -> R
+--
+--     We can also do it the other way around!
+--     if 
+--       z :: (a, b) -> R
+--     and
+--       y :: (b -> R)
+--     then
+--       z' :: (b -> R) -> (a -> R)
+--       z' vy x = sum [ z (x, vy y) | y <- elements]
+--     
+--     So (BUT INVOLVES SUM!)
+--       \z -> z' :: ((a, b) -> R) -> (b -> R) -> (a -> R)
+--
+--     What do I need to get something ?
+--       ((b -> R) -> (a -> R)) -> ((a, b) -> R) -> R)
+--     
+--     if we had a map h :: ((a,b) -> R) -> (d -> R)  
+--     and a map 
 
 
 -- Finite sets can be listed, which is elements
