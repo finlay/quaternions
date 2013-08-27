@@ -6,6 +6,9 @@ import Data.List
 import Test.QuickCheck hiding (elements)
 import Text.PrettyPrint.Boxes
 
+import Numeric.Algebra
+import Prelude hiding ((+), (-), (*), (^), negate, (>), (<), sum, fromInteger)
+
 import Quaternion
 import Extensive
 
@@ -24,10 +27,10 @@ prop_so3_lie_algebra_homomorphism a b =
 
 main =  do
     --test5 elements elements
-    test8 (map return (sym0 ++ ske1 ++ sym2) :: [V Tau]) comm
-    putStrLn " +++ "
-    test8 (map return (sym0 ++ sym1 ++ ske2) :: [V Tau]) comm
-    --quickCheck prop_so3_lie_algebra_homomorphism
+    --test8 (map return (sym0 ++ ske1 ++ sym2) :: [V Tau]) comm
+    --putStrLn " +++ "
+    --test8 (map return (sym0 ++ sym1 ++ ske2) :: [V Tau]) comm
+    quickCheck prop_so3_lie_algebra_homomorphism
 
 data Hole = Hole
 

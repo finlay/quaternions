@@ -242,19 +242,14 @@ instance Group (V a) where
 instance Additive (V v) where
     (+)   = plus 
 
---  -- ALGEBRAS (Associative)
---  class Algebra x where
---      unit :: x
---      mul  :: x -> x -> x
 --  
---  
---  instance (Arbitrary a, Algebra (V a)) => Arbitrary (V a)
---    where
---      arbitrary = 
---        do
---          bs   <- QC.listOf1 QC.arbitrary
---          coef <- QC.vector (length bs)
---          return $ foldl1 (+) $ map (\(n,b) -> scale n (return b)) $ zip coef bs
+instance (Arbitrary a) => Arbitrary (V a)
+  where
+    arbitrary = 
+      do
+        bs   <- QC.listOf1 QC.arbitrary
+        coef <- QC.vector (length bs)
+        return $ foldl1 plus $ map (\(n,b) -> scale n (return b)) $ zip coef bs
 
 
 -- Working around the terrible Num class here
