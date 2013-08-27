@@ -37,116 +37,25 @@ tensor tx ty =  (join . (fmap t') . t'') (Tensor tx ty)
         t'  (Tensor x y) = fmap (flip Tensor y) x
 
 
-{- 
- -  Want to make hom now.
- -  Its a bit tricky! Basically because the linearity is not garanteed.
- -}
+-- Hom represent linear maps.
 data Hom a b = Hom a b deriving (Eq, Ord)
 hom :: (V a -> V b) -> V (Hom a b)
 hom = undefined
-apply :: V (Hom a b) -> V a -> V b
-apply = undefined
-
-{- The hom function is not generally defined. It only works if the domiain function is 
- - linear. Which we don't generally know is the case.
- -
- - The apply function is a bit easier. We have the function:
- - em :: Hom a b -> V a -> V b
- -
- - Just need to extend it linearly over the whole of V (Hom a b) !
- --}
+apply :: (Eq a) => V (Hom a b) -> V a -> V b
+apply l (V ex) = 
+  let pi1 (Hom x y) = x  -- projection  1
+      pi2 (Hom x y) = y  -- projection  2
+      l1 = codual . fmap pi1 $ l
+      l2 = fmap pi2 l
+  in  scale (ex l1) l2
 
 em :: (Eq a) => Hom a b -> V a -> V b
 em (Hom x y) (V vx) = 
   let em' vy x' = if x == x' then vy y else 0
   in  V $ vx . em'
 
-{- The thing is, we don't need to go from general (V a -> V b)
- - but only from (a -> V b).
- - Then we know its going to be linear
- --}
-
-hom' :: (a -> V b) -> V (Hom a b)
---     (a -> (b -> R) -> R) -> ((a, b) -> R) -> R
---     {{ flip first argument }}
---     ((b -> R) -> (a -> R)) -> ((a, b) -> R) -> R
---
---     ((a,b) -> R) -> ???? (b -> R) -> (a -> R)
---
---     Remember that a and b are Finite sets. So, a -> R == [R] of length a
---     Then a map (b -> R) -> (a -> R) == [R] -> [R] (i.e., a matrix)
---     
---     Remember delta (aka eta)
---     delta :: (Eq a) => a -> a -> R 
---     delta x x' = if x == x' then 1 else 0 
---     
---     The (a,b) component of which is given by the value
---     if 
---       f :: (b -> R) -> (a -> R)
---     then 
---       f' :: (a, b) -> R
---       f' (x, y) = f (delta y) x
---
---     So \f -> f' :: ((b -> R) -> (a -> R)) -> (a, b) -> R
---
---     We can also do it the other way around!
---     if 
---       z :: (a, b) -> R
---     and
---       y :: (b -> R)
---     then
---       z' :: (b -> R) -> (a -> R)
---       z' vy x = sum [ z (x, vy y) | y <- elements]
---     
---     So (BUT INVOLVES SUM!)
---       \z -> z' :: ((a, b) -> R) -> (b -> R) -> (a -> R)
---
---     What do I need to get something ?
---       ((b -> R) -> (a -> R)) -> ((a, b) -> R) -> R)
---     
---     if we had a map h :: ((a,b) -> R) -> (d -> R)  
---     and a map 
 
 
-data Hom a b = Hom a b deriving (Eq, Ord)
-hom  :: (V a -> V b) -> V (Hom a b)
-hom  = undefined 
-eval :: V (Hom a b) -> V a -> V b
-eval = undefined
-
-{--
- (((a, b) -> R) -> R) -> ((a -> R) -> R) -> (b -> R) -> R
-
- l vx y = 
-
- (a,) :: b -> (a,b)
- fmap (a,) :: V b -> V (a,b) 
-
- V (a,b) -> V a -> V b
-
-
-  em' :: (Eq a) => (a, b) -> (b -> R) -> (a -> R)
-  em' (x,y) vy = \x' -> if x' == x then vy b else 0
-
-  em' (x, y) :: (b -> R) -> (a -> R)
-  (. em' (x, y)) :: ((a -> R) -> R) -> (b -> R) -> R
-                :: V a -> V b
-
-  em :: (Eq a) => (a, b) -> V a -> V b
-  em (x, y) = (. (em' (x, y)))
-
-  let em :: (Eq a) => (a, b) -> V a -> V b  
-      em (x,y) (V vx) = V $ (vx . (em' (x, y)))
-      em' (x,y) vy = \x' -> if x' == x then vy b else 0
-
-so, we have em :: (a, b) -> V a -> V b
-
---}
-
-em :: (Eq a) => (a, b) -> V a -> V b  
-em (x,y) (V vx) = V $ (vx . (em' (x, y)))
-  where
-    em' (x,y) vy = \x' -> if x' == x then vy y else 0
 
 
 -- Finite sets can be listed, which is elements
