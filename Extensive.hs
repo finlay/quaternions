@@ -108,6 +108,47 @@ hom' :: (a -> V b) -> V (Hom a b)
 --     and a map 
 
 
+data Hom a b = Hom a b deriving (Eq, Ord)
+hom  :: (V a -> V b) -> V (Hom a b)
+hom  = undefined 
+eval :: V (Hom a b) -> V a -> V b
+eval = undefined
+
+{--
+ (((a, b) -> R) -> R) -> ((a -> R) -> R) -> (b -> R) -> R
+
+ l vx y = 
+
+ (a,) :: b -> (a,b)
+ fmap (a,) :: V b -> V (a,b) 
+
+ V (a,b) -> V a -> V b
+
+
+  em' :: (Eq a) => (a, b) -> (b -> R) -> (a -> R)
+  em' (x,y) vy = \x' -> if x' == x then vy b else 0
+
+  em' (x, y) :: (b -> R) -> (a -> R)
+  (. em' (x, y)) :: ((a -> R) -> R) -> (b -> R) -> R
+                :: V a -> V b
+
+  em :: (Eq a) => (a, b) -> V a -> V b
+  em (x, y) = (. (em' (x, y)))
+
+  let em :: (Eq a) => (a, b) -> V a -> V b  
+      em (x,y) (V vx) = V $ (vx . (em' (x, y)))
+      em' (x,y) vy = \x' -> if x' == x then vy b else 0
+
+so, we have em :: (a, b) -> V a -> V b
+
+--}
+
+em :: (Eq a) => (a, b) -> V a -> V b  
+em (x,y) (V vx) = V $ (vx . (em' (x, y)))
+  where
+    em' (x,y) vy = \x' -> if x' == x then vy y else 0
+
+
 -- Finite sets can be listed, which is elements
 class FiniteSet x where elements :: [ x ]
 
