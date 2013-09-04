@@ -30,7 +30,7 @@ instance Abelian Double
 
 orderOrd :: Ord a => a -> a -> Maybe Ordering
 orderOrd a b = Just (compare a b)
-instance Order Double where order = orderOrd 
+instance (Ord a) => Order a where order = orderOrd
 
 instance Division Double where
   recip = Prelude.recip
