@@ -7,11 +7,12 @@
 module Extensive where
 
 import Control.Monad (join)
+import Control.Applicative 
 import Text.Printf
 
 import Numeric.Natural.Internal
 import Numeric.Algebra
-import Prelude hiding ((+), (-), (*), (^), negate, (>), (<), sum, fromInteger)
+import Prelude hiding ((+), (-), (*), (/), (^), negate, (>), (<), sum, fromInteger)
 import qualified Prelude
 
 import Test.QuickCheck (Arbitrary)
@@ -105,7 +106,7 @@ apply l (V ex) =
       pi2 (Hom x y) = y  -- projection  2
       l1 = codual . fmap pi1 $ l
       l2 = fmap pi2 l
-  in  scale (ex l1) l2
+  in  scale (1/(ex l1)) l2
 
 em :: (Eq a) => Hom a b -> V a -> V b
 em (Hom x y) (V vx) = 
@@ -243,6 +244,12 @@ instance Additive (V v) where
     (+)   = plus 
 
 --  
+instance (Arbitrary a, Arbitrary b) => Arbitrary (Tensor a b) where
+    arbitrary = Tensor <$> QC.arbitrary <*> QC.arbitrary
+
+instance (Arbitrary a, Arbitrary b) => Arbitrary (Hom a b) where
+    arbitrary = Hom    <$> QC.arbitrary <*> QC.arbitrary
+
 instance (Arbitrary a) => Arbitrary (V a)
   where
     arbitrary = 
@@ -250,6 +257,7 @@ instance (Arbitrary a) => Arbitrary (V a)
         bs   <- QC.listOf1 QC.arbitrary
         coef <- QC.vector (length bs)
         return $ foldl1 plus $ map (\(n,b) -> scale n (return b)) $ zip coef bs
+
 
 
 -- Working around the terrible Num class here
