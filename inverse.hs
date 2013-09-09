@@ -4,11 +4,14 @@
 {-# LANGUAGE BangPatterns #-}
 
 import Text.Printf
-import Data.List hiding (transpose)
+import Data.List hiding (transpose, sum)
 import Test.QuickCheck hiding (elements)
 import Text.PrettyPrint.Boxes
 import System.Random
 import Control.Monad
+
+import Numeric.Algebra
+import Prelude hiding ((+), (-), (*), (^), (/), negate, (>), (<), sum, fromInteger)
 
 import Quaternion
 import Extensive
@@ -27,10 +30,7 @@ instance Show Matrix where
 
 -- Need to collapse matrix multiplication some how
 mmul :: Matrix -> Matrix -> Matrix
-mmul a b = extend ab
-  where
-    ab :: SO3 -> V SO3
-    ab  = a . b . return
+mmul a b = apply . hom $ (a . b)
 
 -- Make a rotation with given angle in xy plane
 theta :: R
@@ -40,8 +40,8 @@ r :: SO3 -> SO3 -> R -> V SO3 -> V SO3
 r a b t = extend r'
   where 
     r' :: SO3 -> V SO3 
-    r' i | a == i  =  (scale (cos t) (return a)) + (scale (sin t) (return b))
-         | b == i  = -(scale (sin t) (return a)) + (scale (cos t) (return b))
+    r' i | a == i  =         (scale (cos t) (return a))  + (scale (sin t) (return b))
+         | b == i  = (negate (scale (sin t) (return a))) + (scale (cos t) (return b))
          | otherwise  = return i
 
 
