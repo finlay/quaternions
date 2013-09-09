@@ -154,5 +154,19 @@ instance Multiplicative (V SO3) where
         mmu' (Z `Tensor` Y) = minus (return X)
         mmu' (Z `Tensor` Z) = zero
 
+so3 :: V SO3 -> V (Tau)
+so3 = extend so3'
+  where 
+    so3' X = return $ Skew E I
+    so3' Y = return $ Skew E J
+    so3' Z = return $ Skew E K
 
+
+prop_so3_lie_algebra_homomorphism :: V SO3 -> V SO3 -> Property
+prop_so3_lie_algebra_homomorphism a b = 
+    property $ so3 (a * b) == comm (so3 b) (so3 a)
+
+prop_apply_hom_eq_id :: V (Hom SO3 SO3) -> Property
+prop_apply_hom_eq_id a = 
+    property $ a == (hom . apply $ a)
 

@@ -12,25 +12,13 @@ import Prelude hiding ((+), (-), (*), (^), negate, (>), (<), sum, fromInteger)
 import Quaternion
 import Extensive
 
-so3 :: V SO3 -> V (Tau)
-so3 = extend so3'
-  where 
-    so3' X = return $ Skew E I
-    so3' Y = return $ Skew E J
-    so3' Z = return $ Skew E K
-
-
-prop_so3_lie_algebra_homomorphism :: V SO3 -> V SO3 -> Property
-prop_so3_lie_algebra_homomorphism a b = 
-    property $ so3 (a * b) == comm (so3 b) (so3 a)
-
 
 main =  do
-    --test5 elements elements
-    --test8 (map return (sym0 ++ ske1 ++ sym2) :: [V Tau]) comm
-    --putStrLn " +++ "
-    --test8 (map return (sym0 ++ sym1 ++ ske2) :: [V Tau]) comm
-    quickCheck prop_so3_lie_algebra_homomorphism
+    test5 elements elements
+    test8 (map return (sym0 ++ ske1 ++ sym2) :: [V Tau]) comm
+    putStrLn " +++ "
+    test8 (map return (sym0 ++ sym1 ++ ske2) :: [V Tau]) comm
+    --quickCheck prop_so3_lie_algebra_homomorphism
 
 data Hole = Hole
 
