@@ -101,12 +101,10 @@ hom l =
   in  sum [scale c (return (Hom x y)) | x <- xs, (y,c) <- coef x]
 
 apply :: (Eq a) => V (Hom a b) -> V a -> V b
-apply l (V ex) = 
-  let pi1 (Hom x y) = x  -- projection  1
-      pi2 (Hom x y) = y  -- projection  2
-      l1 = codual . fmap pi1 $ l
-      l2 = fmap pi2 l
-  in  scale (1/(ex l1)) l2
+apply = curry (unMaybe . fmap ex . uncurry tensor)
+  where
+    unMaybe = extend (maybe zero return)
+    ex (Tensor (Hom x y) x') = if x == x' then Just y else Nothing
 
 em :: (Eq a) => Hom a b -> V a -> V b
 em (Hom x y) (V vx) = 
