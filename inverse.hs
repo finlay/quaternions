@@ -76,7 +76,7 @@ diagonaliseSym =
   where
     go ds res (m, t) = 
         let (d:ds') = ds 
-            (t', m') = diagStep d m
+            (m', t') = diagStep d m
             res' = res ++ [(m', t')]
         in if   offNorm m' < epsilon 
            then res'
@@ -124,7 +124,7 @@ main = do
     print aat
 
     -- For each of those, caclulate rotations
-    forM_ (take 2 $ diagonaliseSym ata) $ \( m, t) ->
+    forM_ (take 12 $ diagonaliseSym ata) $ \( m, t) ->
         do  putStrLn $ render $ hsep 3 left [(mkBox m),  (mkBox t)]
 
     -- Put it all together
