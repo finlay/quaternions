@@ -68,6 +68,7 @@ diagStep (Diag r s) m =
             !m' = (transpose t') `mmul` m `mmul` t'
         in (m', t')
 
+
 -- Diagonalise a symmetric matrix
 diagonaliseSym :: Matrix -> [(Matrix, Matrix)]
 diagonaliseSym = 
@@ -78,7 +79,7 @@ diagonaliseSym =
         let (d:ds') = ds 
             (m', t') = diagStep d m
             res' = res ++ [(m', t')]
-        in if   offNorm m' < epsilon 
+        in if   offNorm m' < 1e-8
            then res'
            else go ds' res' (m', t')
 
@@ -116,18 +117,50 @@ main = do
     
     -- Calculate two transposes A^TA and AA^T
     let ata = transpose a `mmul` a
-    putStrLn "A^TA = "
-    print ata
+    -- putStrLn "A^TA = "
+    -- print ata
 
     let aat = a `mmul` transpose a
-    putStrLn "AA^T = "
-    print aat
+    -- putStrLn "AA^T = "
+    -- print aat
 
     -- For each of those, caclulate rotations
-    forM_ (take 12 $ diagonaliseSym ata) $ \( m, t) ->
-        do  putStrLn $ render $ hsep 3 left [(mkBox m),  (mkBox t)]
+    let steps = take 100 $ diagonaliseSym ata
+    putStrLn $ "Number of steps = " ++ (show (length steps))
+
+--    forM_ steps $ \(m, t) ->
+--        do  putStrLn $ render $ hsep 3 left [(mkBox m),  (mkBox t)]
 
     -- Put it all together
+    let t = foldl1 mmul (map snd steps)
+    let d = foldl1 (flip const) (map fst steps)
+    --putStrLn "t = "
+    --print t
+
+    let V hd = hom d 
+    let dinv = apply $ sum [ scale (1/(sqrt (hd (delta (Hom i i))))) (return (Hom i i)) | i <- elements ]
+    --putStrLn "d^-1 = "
+    --print dinv
+
+    -- a .t . dinv = s . d . t' . t . d' = s
+    let s = a `mmul` t `mmul` dinv
+    -- putStrLn "s = "
+    --print (transpose s `mmul` s)
+
+    let ainv = (t `mmul` dinv `mmul` (transpose s))
+    putStrLn "A^{-1} = "
+    print ainv
+
+    putStrLn "Check..."
+    print (ainv . a)
+
+-- s^T . t^T . A^T . A . t . s = D
+-- (A . t . s)^T . (A . t . s) = D
+--
+-- Assuming A = X d Y
+-- Then A^T . A = Y^T . d . X^T . X . d .Y
+--              = Y^T . d . d .Y
+-- So if t.s = Y^T, then A . (t.s) = X . d
 
     putStrLn "Done"
 
