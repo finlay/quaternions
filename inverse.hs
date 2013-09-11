@@ -1,11 +1,9 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-import Text.Printf
 import Data.List hiding (transpose, sum)
-import Test.QuickCheck hiding (elements)
 import Text.PrettyPrint.Boxes
 import System.Random
 import Control.Monad
@@ -16,33 +14,26 @@ import Prelude hiding ((+), (-), (*), (^), (/), negate, (>), (<), sum, fromInteg
 import Quaternion
 import Extensive
 
--- Matrix type for 3 x 3 matricies
-type Matrix = V SO3 -> V SO3 
-mkBox :: Matrix -> Box
+mkBox :: (FiniteSet a, FiniteSet b, Eq b, Eq a) 
+      => V (Hom a b) -> Box
 mkBox m = box
       where
-        es = map return elements :: [ V SO3 ]
-        box = hsep 2 left cols
-        cols  = [ vsep 0 right (map (ts . snd) (coefficients (m e))) | e <- es]
+        es = map return elements
+        box = hsep 2 left cls
+        cls = [ vsep 0 right (map (ts . snd) (coefficients (apply m e'))) | e' <- es]
         ts = text . show'
-instance Show Matrix where
-  show = render . mkBox
 
--- Need to collapse matrix multiplication some how
-mmul :: Matrix -> Matrix -> Matrix
-mmul a b = apply . hom $ (a . b)
+printMap :: (FiniteSet a, FiniteSet b, Eq b, Eq a) 
+         =>  (V a -> V b) -> IO ()
+printMap  = putStrLn . render . mkBox . hom
 
--- Make a rotation with given angle in xy plane
-theta :: R
-theta = 12.3*pi
-
-r :: SO3 -> SO3 -> R -> V SO3 -> V SO3
-r a b t = extend r'
+-- Create a rotation on an off diagonal for a endomorphism
+rot :: Eq a => a -> a -> R -> V a -> V a
+rot x' y' t = extend $ r'
   where 
-    r' :: SO3 -> V SO3 
-    r' i | a == i  =         (scale (cos t) (return a))  + (scale (sin t) (return b))
-         | b == i  = (negate (scale (sin t) (return a))) + (scale (cos t) (return b))
-         | otherwise  = return i
+    r' i' | x' == i'  =         (scale (cos t) (return x'))  + (scale (sin t) (return y'))
+          | y' == i'  = (negate (scale (sin t) (return x'))) + (scale (cos t) (return y'))
+          | otherwise = return i'
 
 
 -- Given an off diagonal element, cacluate the angle
@@ -51,18 +42,19 @@ angle ct =
     let sgn a = a / abs a
     in atan $ (sgn ct) / ((abs ct) + (sqrt (1 + ct*ct)))
 
-makeRotation :: Matrix -> SO3 -> SO3 -> Matrix
-makeRotation m x y = 
+makeRotation :: Eq a => (V a -> V a) -> a -> a -> (V a -> V a)
+makeRotation m x' y' = 
     let mc a b = unV (m (return a)) (delta b)
-        ct = ((mc x x) - (mc y y)) / (2*(mc x y))
-    in  r x y (angle ct)
+        ct = ((mc x' x') - (mc y' y')) / (2*(mc x' y'))
+    in  rot x' y' (angle ct)
 
 -- Diagonal element
-data Diag = Diag !SO3 !SO3 deriving (Eq, Show)
-offdiag :: [ Diag ]
-offdiag = [ Diag x y | x <- elements, y <- elements, x < y]
+data Diag a = Diag !a !a deriving (Eq, Show)
+offdiag :: (FiniteSet a, Order a) => [ Diag a ]
+offdiag = [ Diag x' y' | x' <- elements, y' <- elements, x' < y']
 
-diagStep :: Diag -> Matrix -> (Matrix, Matrix)
+diagStep :: (FiniteSet a, Eq a) 
+         => Diag a -> (V a -> V a) -> ((V a -> V a), (V a -> V a))
 diagStep (Diag r s) m = 
         let !t' = makeRotation m r s
             !m' = (transpose t') `mmul` m `mmul` t'
@@ -70,57 +62,50 @@ diagStep (Diag r s) m =
 
 
 -- Diagonalise a symmetric matrix
-diagonaliseSym :: Matrix -> [(Matrix, Matrix)]
+diagonaliseSym :: (FiniteSet a, Eq a, Order a) 
+               => (V a -> V a) -> [(V a -> V a, V a -> V a)]
 diagonaliseSym = 
-  let dds = foldr1 (++) (repeat offdiag ) 
-  in  go dds [] . (, id)
-  where
-    go ds res (m, t) = 
+  let dds = foldr1 (++) (repeat offdiag)
+      go ds res (m, _) = 
         let (d:ds') = ds 
             (m', t') = diagStep d m
             res' = res ++ [(m', t')]
         in if   offNorm m' < 1e-8
            then res'
            else go ds' res' (m', t')
+  in  go dds [] . (, id)
 
     
-offNorm :: Matrix -> R
+offNorm :: (FiniteSet a, Eq a, Order a) => (V a -> V a) -> R
 offNorm m = 
   let mc (Diag a b) = unV (m (return a)) (delta b)
-   in sum $ map ((**2) . mc) offdiag
+  in  sum $ map ((**2) . mc) offdiag
 
 -- Make a random matrix
-randomElement :: IO (V SO3)
+randomElement :: (FiniteSet a) => IO (V a)
 randomElement = 
  do 
-    cs <- replicateM 3 (randomRIO (-10, 10))
-    return $ foldl1 (+) $ map (uncurry scale) (zip cs [x, y, z])
+    let sce b = fmap (flip scale (return b)) (randomRIO (-10, 10) )
+    cs <- mapM sce elements
+    return $ foldl1 (+) cs
 
-randomMatrix :: IO Matrix
-randomMatrix = 
-  do
-    elx <- randomElement 
-    ely <- randomElement
-    elz <- randomElement
-    let m' :: SO3 -> V SO3
-        m' X = elx
-        m' Y = ely
-        m' Z = elz
-    return $ extend m'
+randomMatrix :: (FiniteSet a, Eq a, FiniteSet b, Eq b) => IO (V a -> V b)
+randomMatrix = fmap apply randomElement
 
+main :: IO ()
 main = do 
     
     -- Generate random three by three linear transformation
-    a <- randomMatrix
+    (a :: V H -> V H)  <- randomMatrix
     putStrLn "A = "
-    print a
+    printMap a
     
     -- Calculate two transposes A^TA and AA^T
     let ata = transpose a `mmul` a
     -- putStrLn "A^TA = "
     -- print ata
 
-    let aat = a `mmul` transpose a
+    --let aat = a `mmul` transpose a
     -- putStrLn "AA^T = "
     -- print aat
 
@@ -138,7 +123,7 @@ main = do
     --print t
 
     let V hd = hom d 
-    let dinv = apply $ sum [ scale (1/(sqrt (hd (delta (Hom i i))))) (return (Hom i i)) | i <- elements ]
+    let dinv = apply $ sum [ scale (1/(sqrt (hd (delta (Hom s s))))) (return (Hom s s)) | s <- elements ]
     --putStrLn "d^-1 = "
     --print dinv
 
@@ -149,10 +134,10 @@ main = do
 
     let ainv = (t `mmul` dinv `mmul` (transpose s))
     putStrLn "A^{-1} = "
-    print ainv
+    printMap ainv
 
     putStrLn "Check..."
-    print (ainv . a)
+    printMap (ainv . a)
 
 -- s^T . t^T . A^T . A . t . s = D
 -- (A . t . s)^T . (A . t . s) = D
