@@ -111,6 +111,11 @@ em (Hom x y) (V vx) =
   let em' vy x' = if x == x' then vy y else 0
   in  V $ vx . em'
 
+-- memoised multiplication
+mmul :: (Eq a, FiniteSet a, Eq c, FiniteSet c) 
+     => (V b -> V c) -> (V a -> V b) -> (V a -> V c)
+mmul a b = apply . hom $ (a . b)
+
 
 
 -- Finite sets can be listed, which is elements
