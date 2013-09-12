@@ -3,9 +3,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Quaternion where
 
-import Data.List (unfoldr)
-import Data.Maybe (fromJust)
-
 import Numeric.Algebra
 import Prelude hiding ((+), (-), (*), (^), negate, (>), (<), sum, fromInteger)
 import qualified Prelude
@@ -23,7 +20,8 @@ instance Show H where
     show E = "e" ; show I = "i"
     show J = "j" ; show K = "k"
 
-[e,i,j,k] = map return elements :: [V H]
+e, i, j, k :: V H
+[e,i,j,k] = map return elements
 
 mu :: V (Tensor H H) -> V H
 mu = extend mu'
@@ -42,17 +40,21 @@ mu = extend mu'
     mu' (K `Tensor` K) = minus e
 
 instance Multiplicative (V H) where
-    (*) x y = mu (x `tensor` y)
+    (*) x' y' = mu (x' `tensor` y')
 
 -- Now lets make Tensor H H an algebra
 instance Multiplicative (V (Tensor H H)) where
-    (*) x y = extend muHH (x `tensor` y)
+    (*) x' y' = extend muHH (x' `tensor` y')
             where 
-                muHH  (Tensor (Tensor x y) (Tensor x' y')) 
-                    = ((return x) * (return x')) `tensor` ((return y') * (return y))
+                muHH  (Tensor (Tensor xe ye) (Tensor xe' ye')) 
+                    = ((return xe) * (return xe')) `tensor` ((return ye') * (return ye))
 
+comm :: (Multiplicative r, Group r)
+     => r -> r -> r
 comm a b = a * b - b * a
-ehh = map return elements :: [V (Tensor H H)]
+
+ehh :: [V (Tensor H H)]
+ehh = map return elements
 
 -- Create a new more convenient basis for H Tensor H
 -- Need to give names, and elements
@@ -62,6 +64,7 @@ instance Show Tau where
     show (Sym  a b) = show a ++ " \x2228 " ++ show b
     show (Skew a b) = show a ++ " \x2227 " ++ show b
 
+sym0, sym1, sym2, ske1, ske2 :: [Tau]
 sym0 = [ Sym  a a | a <- [E,I,J,K]]
 sym1 = [ Sym  E a | a <- [I,J,K]]
 sym2 = [ Sym  J K , Sym  K I, Sym  I J]
@@ -73,19 +76,20 @@ instance FiniteSet Tau where
 instance Arbitrary Tau where arbitrary = QC.elements elements
 
 instance Multiplicative (V Tau) where
-    (*) x y = injectTauInv ((injectTau x) * (injectTau y))
+    (*) x' y' = injectTauInv ((injectTau x') * (injectTau y'))
 
-tau = map return elements :: [V Tau]
+tau :: [V Tau]
+tau = map return elements
 
 injectTau :: V Tau -> V (Tensor H H)
 injectTau = extend injectTau'
   where
-    injectTau' (Sym  x y) =  let x' = return x 
-                                 y' = return y
-                             in  scale 0.5 (x' `tensor` y' + y' `tensor` x')
-    injectTau' (Skew x y) =  let x' = return x 
-                                 y' = return y
-                             in  scale 0.5 (x' `tensor` y' - y' `tensor` x')
+    injectTau' (Sym  xe ye) = let x' = return xe 
+                                  y' = return ye
+                              in  scale 0.5 (x' `tensor` y' + y' `tensor` x')
+    injectTau' (Skew xe ye) = let x' = return xe 
+                                  y' = return ye
+                              in  scale 0.5 (x' `tensor` y' - y' `tensor` x')
 
 injectTauInv :: V (Tensor H H) -> V Tau
 --injectTauInv = fromJust $ inverse injectTau
@@ -108,21 +112,14 @@ injectTauInv = extend injectTauInv'
     injectTauInv' (K `Tensor` I) = (return (Sym K I)) + (return (Skew K I))
     injectTauInv' (I `Tensor` K) = (return (Sym K I)) - (return (Skew K I))
 
--- Lets see how one element acts
---checkElement :: V x -> V x -> String
-checkElement a b = 
-    let bs = unfoldr (\b' -> let b'' = comm a b' in if b == b'' || b'' == 0 then Nothing else Just (b'', b'')) b 
-    in  bs
-
-
 
 -- Killing form
 killing :: (Multiplicative (V a), FiniteSet a, Eq a) => V a -> V a -> R
-killing x y = trace (ad x . ad y)
+killing x' y' = trace (ad x' . ad y')
   where
     ad = comm 
     trace f = sum $ map (diag f) elements
-    diag f e = coef (f (return e)) e
+    diag f e' = coef (f (return e')) e'
 
 -- Construct as Lie algebra
 
@@ -137,10 +134,11 @@ instance Show SO3
 instance Arbitrary SO3 where arbitrary = QC.elements elements
 
 
-[x, y, z] = map return elements :: [V SO3]
+x, y, z :: V SO3
+[x, y, z] = map return elements
 
 instance Multiplicative (V SO3) where
-    (*) x y = mmu (x `tensor` y)
+    (*) x' y' = mmu (x' `tensor` y')
       where 
         mmu :: V (Tensor SO3 SO3) -> V SO3
         mmu = extend mmu'

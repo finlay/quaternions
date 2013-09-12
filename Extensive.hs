@@ -2,7 +2,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Extensive where
 
@@ -20,7 +22,10 @@ import qualified Test.QuickCheck as QC
 
 
 --type R = Rational ; epsilon = 0 -- slow and accurate
-type R = Double ; epsilon = 1e-6 -- fast and approximate
+type R = Double ; 
+epsilon :: R
+epsilon = 1e-6 -- fast and approximate 
+show' :: forall t. (PrintfType (R -> t)) => R -> t
 show' r = printf "%0.4f" $ if abs r < epsilon then 0 else r
 
 instance Additive Double where
@@ -97,8 +102,8 @@ data Hom a b = Hom a b deriving (Eq, Ord)
 hom :: (FiniteSet a, FiniteSet b, Eq b) => (V a -> V b) -> V (Hom a b)
 hom l = 
   let xs = elements
-      coef = coefficients . l . return
-  in  sum [scale c (return (Hom x y)) | x <- xs, (y,c) <- coef x]
+      coefs = coefficients . l . return
+  in  sum [scale c (return (Hom x' y')) | x' <- xs, (y',c) <- coefs x']
 
 apply :: (Eq a) => V (Hom a b) -> V a -> V b
 apply = curry (unMaybe . fmap ex . uncurry tensor)
@@ -140,14 +145,14 @@ delta a b = if a == b then 1 else 0
 coefficients :: (FiniteSet x, Eq x) => V x -> [(x, R)]
 coefficients (V v) = map (\e -> (e, v (delta e))) elements
 
-instance (Eq a, FiniteSet a) => Eq (a -> R) where
-    x == y = all (\e -> x e == y e) elements
+--instance (Eq a, FiniteSet a) => Eq (a -> R) where
+--    x == y = all (\e -> x e == y e) elements
 
 instance (Eq a, FiniteSet a) => Eq (V a) where
-    x == y = sum (map (squared . snd) ( coefficients (subtract x y))) <= epsilon
+    x' == y' = sum (map (squared . snd) ( coefficients (subtract x' y'))) <= epsilon
               where 
-                squared x = x * x
-                subtract (V x) (V y) = V $ (\ar -> x ar - y ar)
+                squared x'' = x'' * x''
+                subtract (V x'') (V y'') = V $ (\ar -> x'' ar - y'' ar)
 
 instance (Eq a, FiniteSet a, Ord a) => Ord (V a) where
     compare x y = compare (coefficients x) (coefficients y)
@@ -177,9 +182,9 @@ transpose lm = dual . flip (unV . lm . return) . codual
 
 -- want to allow the creation of inverses 
 -- assume that the linear map is isometric!
-inverse :: (FiniteSet a, FiniteSet b, Eq a, Eq b) 
-        => (V a -> V b) -> Maybe (V b -> V a)
-inverse lm = Just $ transpose lm
+-- inverse :: (FiniteSet a, FiniteSet b, Eq a, Eq b) 
+--         => (V a -> V b) -> Maybe (V b -> V a)
+-- inverse lm = Just $ transpose lm
 
 
 
@@ -257,9 +262,9 @@ instance (Arbitrary a) => Arbitrary (V a)
   where
     arbitrary = 
       do
-        bs   <- QC.listOf1 QC.arbitrary
-        coef <- QC.vector (length bs)
-        return $ foldl1 plus $ map (\(n,b) -> scale n (return b)) $ zip coef bs
+        bs    <- QC.listOf1 QC.arbitrary
+        coefs <- QC.vector (length bs)
+        return $ foldl1 plus $ map (\(n,b) -> scale n (return b)) $ zip coefs bs
 
 
 

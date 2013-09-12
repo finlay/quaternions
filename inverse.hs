@@ -81,6 +81,21 @@ offNorm m =
   let mc (Diag a b) = unV (m (return a)) (delta b)
   in  sum $ map ((**2) . mc) offdiag
 
+
+inverse :: (FiniteSet a, Eq a, Order a, FiniteSet b, Eq b, Order b)
+        => (V a -> V b) -> V b -> V a
+inverse l = 
+    let ltl   = transpose l `mmul` l
+        steps = diagonaliseSym ltl
+        lt     = foldl1 mmul (map snd steps)
+        d     = foldl1 (flip const) (map fst steps)
+        V hd  = hom d 
+        de s' = scale (1/(sqrt (hd (delta (Hom s' s'))))) (return (Hom s' s'))
+        dinv  = apply $ sum [ de s | s <- elements ]
+        rt = l `mmul` lt `mmul` dinv
+        linv = lt `mmul` dinv `mmul` (transpose rt)
+    in linv
+
 -- Make a random matrix
 randomElement :: (FiniteSet a) => IO (V a)
 randomElement = 
@@ -100,52 +115,14 @@ main = do
     putStrLn "A = "
     printMap a
     
-    -- Calculate two transposes A^TA and AA^T
-    let ata = transpose a `mmul` a
-    -- putStrLn "A^TA = "
-    -- print ata
+    let ainv = inverse a
 
-    --let aat = a `mmul` transpose a
-    -- putStrLn "AA^T = "
-    -- print aat
-
-    -- For each of those, caclulate rotations
-    let steps = take 100 $ diagonaliseSym ata
-    putStrLn $ "Number of steps = " ++ (show (length steps))
-
---    forM_ steps $ \(m, t) ->
---        do  putStrLn $ render $ hsep 3 left [(mkBox m),  (mkBox t)]
-
-    -- Put it all together
-    let t = foldl1 mmul (map snd steps)
-    let d = foldl1 (flip const) (map fst steps)
-    --putStrLn "t = "
-    --print t
-
-    let V hd = hom d 
-    let dinv = apply $ sum [ scale (1/(sqrt (hd (delta (Hom s s))))) (return (Hom s s)) | s <- elements ]
-    --putStrLn "d^-1 = "
-    --print dinv
-
-    -- a .t . dinv = s . d . t' . t . d' = s
-    let s = a `mmul` t `mmul` dinv
-    -- putStrLn "s = "
-    --print (transpose s `mmul` s)
-
-    let ainv = (t `mmul` dinv `mmul` (transpose s))
     putStrLn "A^{-1} = "
     printMap ainv
 
     putStrLn "Check..."
     printMap (ainv . a)
 
--- s^T . t^T . A^T . A . t . s = D
--- (A . t . s)^T . (A . t . s) = D
---
--- Assuming A = X d Y
--- Then A^T . A = Y^T . d . X^T . X . d .Y
---              = Y^T . d . d .Y
--- So if t.s = Y^T, then A . (t.s) = X . d
 
     putStrLn "Done"
 
