@@ -4,7 +4,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import Data.List hiding (transpose, sum)
-import Text.PrettyPrint.Boxes
 import System.Random
 import Control.Monad
 
@@ -13,19 +12,6 @@ import Prelude hiding ((+), (-), (*), (^), (/), negate, (>), (<), sum, fromInteg
 
 import Quaternion
 import Extensive
-
-mkBox :: (FiniteSet a, FiniteSet b, Eq b, Eq a) 
-      => V (Hom a b) -> Box
-mkBox m = box
-      where
-        es = map return elements
-        box = hsep 2 left cls
-        cls = [ vsep 0 right (map (ts . snd) (coefficients (apply m e'))) | e' <- es]
-        ts = text . show'
-
-printMap :: (FiniteSet a, FiniteSet b, Eq b, Eq a) 
-         =>  (V a -> V b) -> IO ()
-printMap  = putStrLn . render . mkBox . hom
 
 
 -- Make a random matrix

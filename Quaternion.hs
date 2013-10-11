@@ -91,9 +91,9 @@ injectTau = extend injectTau'
                                   y' = return ye
                               in  scale 0.5 (x' `tensor` y' - y' `tensor` x')
 
-injectTauInv :: V (Tensor H H) -> V Tau
 --injectTauInv = fromJust $ inverse injectTau
-injectTauInv = extend injectTauInv'
+injectTauInv' :: V (Tensor H H) -> V Tau
+injectTauInv' = extend injectTauInv'
   where
     injectTauInv' (E `Tensor` E) = return (Sym E E) 
     injectTauInv' (I `Tensor` I) = return (Sym I I)
@@ -112,6 +112,8 @@ injectTauInv = extend injectTauInv'
     injectTauInv' (K `Tensor` I) = (return (Sym K I)) + (return (Skew K I))
     injectTauInv' (I `Tensor` K) = (return (Sym K I)) - (return (Skew K I))
 
+injectTauInv :: V (Tensor H H) -> V Tau
+injectTauInv = inverse injectTau
 
 -- Killing form
 killing :: (Multiplicative (V a), FiniteSet a, Eq a) => V a -> V a -> R
@@ -119,6 +121,7 @@ killing x' y' = trace (ad x' . ad y')
   where
     ad = comm 
     trace f = sum $ map (diag f) elements
+    coef (V v) = v . delta
     diag f e' = coef (f (return e')) e'
 
 -- Construct as Lie algebra

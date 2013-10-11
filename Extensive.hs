@@ -9,7 +9,9 @@
 
 module Extensive where
 
+import Text.PrettyPrint.Boxes
 import Control.Monad (join)
+import Control.Monad.State
 import Control.Applicative 
 import Text.Printf
 
@@ -183,7 +185,6 @@ transpose lm = dual . flip (unV . lm . return) . codual
 
 -- --------------------
 -- Inverses
---
 -- uses a Jakobi approach
 
 -- Create a rotation on an off diagonal for a endomorphism
@@ -213,28 +214,51 @@ offdiag :: (FiniteSet a, Order a) => [ Diag a ]
 offdiag = [ Diag x' y' | x' <- elements, y' <- elements, x' < y']
 
 diagStep :: (FiniteSet a, Eq a) 
-         => Diag a -> (V a -> V a) -> ((V a -> V a), (V a -> V a))
+         => Diag a -> (V a -> V a) -> (V a -> V a, V a -> V a)
 diagStep (Diag r s) m = 
         let !t' = makeRotation m r s
             !m' = (transpose t') `mmul` m `mmul` t'
         in (m', t')
 
+data DiagState a = DiagState { diags       :: [Diag a]
+                             , transforms  :: [V a -> V a]
+                             , result      :: V a -> V a 
+                             }
+nextDiagStep :: (FiniteSet a, Eq a) => State (DiagState a) ()
+nextDiagStep =
+    let mc ma (Diag a b) = unV (ma (return a)) (delta b)
+    in do
+        d:ds <- gets diags
+        ma <- gets result
+        if mc ma d > 1e-8
+            then do
+                let (m, t) = diagStep d ma
+                ts <- gets transforms
+                modify $ \s -> s { transforms = t:ts, result = m }
+            else do 
+                modify $ \s -> s { diags = ds }
+                nextDiagStep
 
 -- Diagonalise a symmetric matrix
 diagonaliseSym :: (FiniteSet a, Eq a, Order a) 
-               => (V a -> V a) -> [(V a -> V a, V a -> V a)]
-diagonaliseSym = 
-  let dds = foldr1 (++) (repeat offdiag)
-      go ds res (m, _) = 
-        let (d:ds') = ds 
-            (m', t') = diagStep d m
-            res' = res ++ [(m', t')]
-        in if   offNorm m' < 1e-8
-           then res'
-           else go ds' res' (m', t')
-  in  go dds [] . (, id)
+               => (V a -> V a) -> (V a -> V a, [V a -> V a])
+diagonaliseSym ma = 
+    let dds = foldr1 (++) (repeat offdiag)
+        initialState = DiagState { diags      = dds
+                                 , transforms = [id]
+                                 , result     = ma
+                                 }
+        diagonalise = do
+            m <- gets result
+            if offNorm m > 1e-8
+                then nextDiagStep >> diagonalise
+                else do 
+                    m  <- gets result
+                    ts <- gets transforms
+                    return (m, ts)
+    in  evalState diagonalise initialState
+       
 
-    
 offNorm :: (FiniteSet a, Eq a, Order a) => (V a -> V a) -> R
 offNorm m = 
   let mc (Diag a b) = unV (m (return a)) (delta b)
@@ -246,8 +270,8 @@ inverse :: (FiniteSet a, Eq a, Order a, FiniteSet b, Eq b, Order b)
 inverse l = 
     let ltl   = transpose l `mmul` l
         steps = diagonaliseSym ltl
-        lt     = foldl1 mmul (map snd steps)
-        d     = foldl1 (flip const) (map fst steps)
+        lt    = foldl1 mmul (reverse $ snd steps)
+        d     = fst steps
         V hd  = hom d 
         de s' = scale (1/(sqrt (hd (delta (Hom s' s'))))) (return (Hom s' s'))
         dinv  = apply $ sum [ de s | s <- elements ]
@@ -256,23 +280,11 @@ inverse l =
     in linv
 
 
--- Don't really want to use this basis stuff.....
--- Instead just use the linear maps stuff above
-
 -- Basis
-class Basis b x where
-    eta   :: b -> x -> R
-    coef  :: V x -> b -> R
-    coef (V v) = v . eta
-
--- canonical basis
-instance (Eq x) => Basis x x where
-    eta = delta
-
-showInBasis :: (Show b, Eq b, Basis b x) 
-            => [b] -> V x -> String
+showInBasis :: (Show b, Eq b) => [b] -> V b -> String
 showInBasis bs v =
-        let pairs = map (\e -> (e, coef v e)) bs
+        let coef (V v) = v . delta
+            pairs = map (\e -> (e, coef v e)) bs
             showPair (b, n) 
                | n == 1.0    = " + "                  ++ show b
                | n == -1.0   = " - "                  ++ show b
@@ -290,6 +302,21 @@ instance (Eq a, FiniteSet a, Show a) => Show (V a) where
     show = let showInCanonicalBasis :: (Show a, Eq a) => [a] -> V a -> String
                showInCanonicalBasis = showInBasis 
            in  showInCanonicalBasis elements
+
+mkBox :: (FiniteSet a, FiniteSet b, Eq b, Eq a) 
+      => V (Hom a b) -> Box
+mkBox m = box
+      where
+        es = map return elements
+        box = hsep 2 left cls
+        cls = [ vsep 0 right (map (ts . snd) (coefficients (apply m e'))) | e' <- es]
+        ts = text . show'
+
+printMap :: (FiniteSet a, FiniteSet b, Eq b, Eq a) 
+         =>  (V a -> V b) -> IO ()
+printMap  = putStrLn . render . mkBox . hom
+instance (FiniteSet a, FiniteSet b, Eq b, Eq a) => Show (V a -> V b) where
+    show = render. mkBox . hom
 
 instance Monoidal (V a) where
     zero = V $ \_ -> 0
