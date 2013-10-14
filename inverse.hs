@@ -29,7 +29,7 @@ main :: IO ()
 main = do 
     
     -- Generate random three by three linear transformation
-    (a :: V H -> V H)  <- randomMatrix
+    (a :: V (Tensor H H) -> V (Tensor H H))  <- randomMatrix
     putStrLn "A = "
     printMap a
     

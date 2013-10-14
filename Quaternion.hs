@@ -91,7 +91,6 @@ injectTau = extend injectTau'
                                   y' = return ye
                               in  scale 0.5 (x' `tensor` y' - y' `tensor` x')
 
---injectTauInv = fromJust $ inverse injectTau
 injectTauInv' :: V (Tensor H H) -> V Tau
 injectTauInv' = extend injectTauInv'
   where

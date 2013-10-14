@@ -223,40 +223,45 @@ diagStep (Diag r s) m =
 data DiagState a = DiagState { diags       :: [Diag a]
                              , transforms  :: [V a -> V a]
                              , result      :: V a -> V a 
-                             }
+                             , count       :: Double
+                             } deriving Show
 nextDiagStep :: (FiniteSet a, Eq a) => State (DiagState a) ()
 nextDiagStep =
     let mc ma (Diag a b) = unV (ma (return a)) (delta b)
     in do
-        d:ds <- gets diags
-        ma <- gets result
-        if mc ma d > 1e-8
+        s <- get
+        let d:ds = diags s
+        let ma   = result s
+        if True -- mc ma d > 1e-8  -- TODO: Check doesn't work. 
+                                   --       Needs to check if has bypassed all diags
             then do
                 let (m, t) = diagStep d ma
                 ts <- gets transforms
-                modify $ \s -> s { transforms = t:ts, result = m }
+                put $ s { diags = ds, transforms = t:ts, result = m, count = count s + 1 }
             else do 
-                modify $ \s -> s { diags = ds }
+                put $ s { diags = ds }
                 nextDiagStep
 
 -- Diagonalise a symmetric matrix
 diagonaliseSym :: (FiniteSet a, Eq a, Order a) 
-               => (V a -> V a) -> (V a -> V a, [V a -> V a])
-diagonaliseSym ma = 
+               => Double -> (V a -> V a) -> ((V a -> V a, [V a -> V a]), DiagState a)
+diagonaliseSym maxcount ma = 
     let dds = foldr1 (++) (repeat offdiag)
         initialState = DiagState { diags      = dds
                                  , transforms = [id]
                                  , result     = ma
+                                 , count      = 0
                                  }
         diagonalise = do
             m <- gets result
-            if offNorm m > 1e-8
+            c <- gets count
+            if c < maxcount && offNorm m > 1e-8 
                 then nextDiagStep >> diagonalise
                 else do 
                     m  <- gets result
                     ts <- gets transforms
                     return (m, ts)
-    in  evalState diagonalise initialState
+    in  runState diagonalise initialState
        
 
 offNorm :: (FiniteSet a, Eq a, Order a) => (V a -> V a) -> R
@@ -269,7 +274,7 @@ inverse :: (FiniteSet a, Eq a, Order a, FiniteSet b, Eq b, Order b)
         => (V a -> V b) -> V b -> V a
 inverse l = 
     let ltl   = transpose l `mmul` l
-        steps = diagonaliseSym ltl
+        (steps, ds) = diagonaliseSym 1000 ltl
         lt    = foldl1 mmul (reverse $ snd steps)
         d     = fst steps
         V hd  = hom d 
