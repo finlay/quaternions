@@ -294,19 +294,19 @@ showInBasis bs v =
                | n == " + 1" = " + "  ++ show b
                | n == " - 1" = " - "  ++ show b
                | otherwise   = n      ++ show b
-            showN n' = let n = (read $ printf "%0.5f" n' ) :: Double
-                           i = n == fromInteger (round n)
-                           sh = if i then show . round else show 
-                       in if n > 0 then " + " ++ sh n else " - " ++ sh (abs n)
-        in  case map showPair . map (\(b,n) -> (b, showN n)) . filter (\(_,n) -> n /= 0.0) $ pairs of 
+            showN (b, n') = let n = (read $ printf "%0.5f" n' ) :: Double
+                                i = n == fromInteger (round n)
+                                sh = if i then show . round else show 
+                            in (b, if n > 0 then " + " ++ sh n else " - " ++ sh (abs n))
+        in  case map (showPair . showN) . filter (\(_,n) -> n /= 0.0) $ pairs of 
                   [] -> " 0"
                   ss -> concat ss
 
 
 instance (Eq a, FiniteSet a, Show a) => Show (V a) where
-    show = let showInCanonicalBasis :: (Show a, Eq a) => [a] -> V a -> String
-               showInCanonicalBasis = showInBasis 
-           in  showInCanonicalBasis elements
+    show = let sh :: (Show a, Eq a) => [a] -> V a -> String
+               sh = showInBasis 
+           in  sh elements
 
 mkBox :: (FiniteSet a, FiniteSet b, Eq b, Eq a) 
       => V (Hom a b) -> Box
