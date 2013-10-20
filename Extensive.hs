@@ -291,14 +291,14 @@ showInBasis bs v =
         let coef (V v) = v . delta
             pairs = map (\e -> (e, coef v e)) bs
             showPair (b, n) 
-               | n == 1.0    = " + "                  ++ show b
-               | n == -1.0   = " - "                  ++ show b
-               | n > 0       = " + " ++ showN n       ++ show b
-               | otherwise   = " - " ++ showN (abs n) ++ show b
-            showN n = if n == fromInteger (round n) 
-                       then show (round n) 
-                       else show n
-        in  case map showPair . filter (\(_,n) -> n /= 0.0) $ pairs of 
+               | n == " + 1" = " + "  ++ show b
+               | n == " - 1" = " - "  ++ show b
+               | otherwise   = n      ++ show b
+            showN n' = let n = (read $ printf "%0.5f" n' ) :: Double
+                           i = n == fromInteger (round n)
+                           sh = if i then show . round else show 
+                       in if n > 0 then " + " ++ sh n else " - " ++ sh (abs n)
+        in  case map showPair . map (\(b,n) -> (b, showN n)) . filter (\(_,n) -> n /= 0.0) $ pairs of 
                   [] -> " 0"
                   ss -> concat ss
 
