@@ -13,7 +13,6 @@ import Prelude hiding ((+), (-), (*), (^), (/), negate, (>), (<), sum, fromInteg
 import Quaternion
 import Extensive
 
-
 -- Make a random matrix
 randomElement :: (FiniteSet a) => IO (V a)
 randomElement = 
@@ -30,16 +29,17 @@ main = do
     
     -- Generate random three by three linear transformation
     (a :: V (Tensor H H) -> V (Tensor H H))  <- randomMatrix
+    --(a :: V H -> V H)  <- randomMatrix
     putStrLn "A = "
     printMap a
     
-    let ainv = inverse a
+    let (ainv, ds) = inverse' a
 
     putStrLn "A^{-1} = "
     printMap ainv
 
     putStrLn "Check..."
-    printMap (ainv . a)
+    print (offNorm $ ainv . a)
 
 
     putStrLn "Done"

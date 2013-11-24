@@ -224,6 +224,8 @@ data DiagState a = DiagState { diags       :: [Diag a]
                              , transforms  :: [V a -> V a]
                              , result      :: V a -> V a 
                              , count       :: Double
+                             , diagsTotal  :: Int
+                             , diagsLeft   :: Int
                              } deriving Show
 nextDiagStep :: (FiniteSet a, Eq a) => State (DiagState a) ()
 nextDiagStep =
@@ -232,25 +234,39 @@ nextDiagStep =
         s <- get
         let d:ds = diags s
         let ma   = result s
-        if True -- mc ma d > 1e-8  -- TODO: Check doesn't work. 
-                                   --       Needs to check if has bypassed all diags
+        if (abs $ mc ma d) > 1e-8 
             then do
                 let (m, t) = diagStep d ma
                 ts <- gets transforms
-                put $ s { diags = ds, transforms = t:ts, result = m, count = count s + 1 }
+                put $ s { diags      = ds 
+                        , transforms = t:ts
+                        , result     = m
+                        , count      = count s + 1
+                        , diagsLeft  = diagsTotal s
+                        }
             else do 
-                put $ s { diags = ds }
-                nextDiagStep
+                let diags_left = diagsLeft s - 1
+                if diags_left Prelude.> 0 
+                    then do
+                        put $ s { diags     = ds 
+                                , diagsLeft = diags_left - 1
+                                }
+                        nextDiagStep
+                    else 
+                        return ()
 
 -- Diagonalise a symmetric matrix
 diagonaliseSym :: (FiniteSet a, Eq a, Order a) 
                => Double -> (V a -> V a) -> ((V a -> V a, [V a -> V a]), DiagState a)
 diagonaliseSym maxcount ma = 
-    let dds = foldr1 (++) (repeat offdiag)
+    let ds = offdiag
+        dds = foldr1 (++) (repeat ds)
         initialState = DiagState { diags      = dds
                                  , transforms = [id]
                                  , result     = ma
                                  , count      = 0
+                                 , diagsTotal = length ds
+                                 , diagsLeft  = length ds
                                  }
         diagonalise = do
             m <- gets result
@@ -270,9 +286,9 @@ offNorm m =
   in  sum $ map ((**2) . mc) offdiag
 
 
-inverse :: (FiniteSet a, Eq a, Order a, FiniteSet b, Eq b, Order b)
-        => (V a -> V b) -> V b -> V a
-inverse l = 
+inverse' :: (FiniteSet a, Eq a, Order a, FiniteSet b, Eq b, Order b)
+        => (V a -> V b) -> (V b -> V a, DiagState a)
+inverse' l = 
     let ltl   = transpose l `mmul` l
         (steps, ds) = diagonaliseSym 1000 ltl
         lt    = foldl1 mmul (reverse $ snd steps)
@@ -282,8 +298,10 @@ inverse l =
         dinv  = apply $ sum [ de s | s <- elements ]
         rt    = l `mmul` lt `mmul` dinv
         linv  = lt `mmul` dinv `mmul` (transpose rt)
-    in linv
-
+    in (linv, ds)
+inverse :: (FiniteSet a, Eq a, Order a, FiniteSet b, Eq b, Order b)
+        => (V a -> V b) -> V b -> V a
+inverse = fst . inverse'
 
 -- Basis
 showInBasis :: (Show b, Eq b) => [b] -> V b -> String
