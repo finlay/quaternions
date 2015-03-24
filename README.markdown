@@ -1,5 +1,6 @@
 # Quaternionic experiment
 
+
 ## Introduction
 
 Lie algebras are at the heart of geometry and analysis. For example, they
